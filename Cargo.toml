@@ -1,0 +1,26 @@
+[package]
+name = "brewer"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+argp = "0.3"
+rpassword = "7.2"
+reqwest = {version = "0.11", features = ["blocking", "json", "multipart"]}
+serde = { version = "1.0", features = ["derive"]}
+log = "0.4"
+serde_json = "1.0"
+env_logger = "0.10"
+
+command_macro = { path = "macros/command_macro" }
+command_macro_derive = { path = "macros/command_macro_derive" }
+config_macro = { path = "macros/config_macro" }
+config_macro_derive = { path = "macros/config_macro_derive" }
+
+goodmorning-bindings = { git = "https://github.com/gmornin/rust-bindings", rev = "6b5dd7f" }
+
+[features]
+default = ["debug"]
+debug = []
