@@ -4,7 +4,7 @@ use argp::FromArgs;
 use command_macro::CommandTrait;
 use command_macro_derive::Command;
 
-use crate::{functions::init_logger, *};
+use crate::*;
 
 use self::core::*;
 
@@ -20,10 +20,6 @@ pub struct TopLevel {
     /// Use unencrypted http traffic instead of https.
     #[argp(switch, global)]
     pub http: bool,
-    // #[argp(option, short = 'i', default = "crate::functions::instance_or_exit()")]
-    #[argp(option, short = 'i', default = "String::new()")]
-    /// Instance domain or IP.
-    pub instance: String,
 
     #[argp(subcommand)]
     pub subcommand: TopLevelSubcommands,
@@ -33,21 +29,17 @@ pub struct TopLevel {
 #[derive(FromArgs, Command)]
 #[argp(subcommand)]
 pub enum TopLevelSubcommands {
-    Create(Create),
+    Register(Register),
     Version(Version),
+    Login(Login),
+    Logout(Logout),
+    Regen(Regen),
 }
 
 impl TopLevel {
     pub fn run(&self) -> Result<(), Box<dyn Error>> {
-        if self.verbose {
-            init_logger(log::LevelFilter::Trace)
-        } else {
-            init_logger(log::LevelFilter::Info)
-        }
-
         HTTP.set(self.http).unwrap();
 
-        INSTANCE.set(self.instance.clone()).unwrap();
         self.subcommand.run().unwrap();
 
         Ok(())

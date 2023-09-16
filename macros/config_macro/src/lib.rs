@@ -30,6 +30,7 @@ where
         debug!("Reading config file at {:?}", Self::path());
 
         let config = if path.exists() {
+            debug!("Config file exists, reading file.");
             let s = match fs::read_to_string(&path) {
                 Ok(s) => s,
                 Err(e) => {
@@ -37,6 +38,7 @@ where
                 }
             };
 
+            trace!("Deserializing file content.");
             match serde_yaml::from_str(&s) {
                 Ok(v) => v,
                 Err(e) => {
@@ -56,6 +58,7 @@ where
     fn save(&self) -> Result<(), ConfigError> {
         let s = serde_yaml::to_string(&self).unwrap();
         let path = Self::path();
+        trace!("Saving config file to {:?}", path);
         let mut file = match OpenOptions::new()
             .write(true)
             .truncate(true)
@@ -68,6 +71,7 @@ where
         if let Err(e) = file.write_all(s.as_bytes()) {
             return Err(ConfigError::FsError { path, error: e });
         }
+        trace!("Config file saved.");
 
         Ok(())
     }
@@ -109,5 +113,6 @@ fn create_parent() -> Result<(), ConfigError> {
     if path.exists() {
         return Ok(());
     }
+    debug!("Directory does not exist in {:?}, creating.", path);
     fs::create_dir(&path).map_err(move |e| ConfigError::FsError { path, error: e })
 }

@@ -1,6 +1,7 @@
 use std::error::Error;
 
 use argp::FromArgs;
+use command_macro::CommandTrait;
 
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(FromArgs)]
@@ -8,8 +9,8 @@ use argp::FromArgs;
 /// Prints CLI version and exits.
 pub struct Version {}
 
-impl Version {
-    pub fn run(&self) -> Result<(), Box<dyn Error>> {
+impl CommandTrait for Version {
+    fn run(&self) -> Result<(), Box<dyn Error>> {
         println!(
             "{} {} (git {})",
             env!("CARGO_PKG_NAME"),

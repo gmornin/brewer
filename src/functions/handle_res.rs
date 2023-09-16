@@ -2,12 +2,14 @@ use std::error::Error;
 
 use config_macro::ConfigTrait;
 use goodmorning_bindings::services::v1::{V1Error, V1Response};
+use log::*;
 
 use crate::{structs::CredsConfig, CREDS, INSTANCE};
 
 use super::duration_as_string;
 
 pub fn ev1_handle(err: &V1Error) -> Result<(), Box<dyn Error>> {
+    debug!("Handling error {err:?}");
     match err {
         V1Error::UsernameTaken => println!("The username you've chosen has already been taken by another user,\nplease choose another unique username.\nNote that 2 usernames with different casing are considered the same."),
         V1Error::EmailTaken => println!("This email has already been used for another account,\nyou can only register one account for each email address.\nPlease use your own email address, and stop quit making so many account."),
@@ -15,7 +17,9 @@ pub fn ev1_handle(err: &V1Error) -> Result<(), Box<dyn Error>> {
         V1Error::PasswordIncorrect => println!("That is not the correct password,\ndouble check if both your password and identifier (email, username, user ID) are correct."),
         V1Error::InvalidToken => {
             let creds = unsafe{ CREDS.get_mut().unwrap() };
+            trace!("Token invalid, clearning creds.");
             creds.clear();
+            trace!("Writing changes to {:?}", CredsConfig::path());
             creds.save()?;
             println!("The user token you provided is invalid,\nit is likely that someone (hopefully you) has regenerate the token on another device,\nwhich invalidates all existing sessions, including this one.\nPlease run the login command again to gain access to your account.")
         },
@@ -56,6 +60,7 @@ pub fn ev1_handle(err: &V1Error) -> Result<(), Box<dyn Error>> {
 }
 
 pub fn v1_handle(res: &V1Response) -> Result<(), Box<dyn Error>> {
+    debug!("Handling response {res:?}");
     #[allow(unused_variables)]
     match res {
         V1Response::Created { id, token } => {
@@ -63,9 +68,10 @@ pub fn v1_handle(res: &V1Response) -> Result<(), Box<dyn Error>> {
             let creds = unsafe { CREDS.get_mut().unwrap() };
             *creds = CredsConfig {
                 id: *id,
-                instance: INSTANCE.get().unwrap().clone(),
+                instance: unsafe { INSTANCE.get().unwrap().clone() },
                 token: token.clone(),
             };
+            trace!("Writing new account creds to {:?}", CredsConfig::path());
             creds.save()?;
             println!("you are now logged in");
         }
@@ -73,6 +79,7 @@ pub fn v1_handle(res: &V1Response) -> Result<(), Box<dyn Error>> {
             println!("Account deleted successfully, all info has been irreversibly deleted.");
             let creds = unsafe { CREDS.get_mut().unwrap() };
             creds.clear();
+            trace!("Clearning account creads and writing changes to {:?}", CredsConfig::path());
             creds.save()?;
             println!("Login data stored has been deleted.");
         }
@@ -80,9 +87,10 @@ pub fn v1_handle(res: &V1Response) -> Result<(), Box<dyn Error>> {
             let creds = unsafe { CREDS.get_mut().unwrap() };
             *creds = CredsConfig {
                 id: *id,
-                instance: INSTANCE.get().unwrap().clone(),
+                instance: unsafe { INSTANCE.get().unwrap().clone() },
                 token: token.clone(),
             };
+            trace!("Writing account creds to {:?}", CredsConfig::path());
             creds.save()?;
             println!("you are now logged in");
         }
@@ -90,6 +98,7 @@ pub fn v1_handle(res: &V1Response) -> Result<(), Box<dyn Error>> {
             println!("Token regenerated, all other sessions are invalidated.");
             let creds = unsafe { CREDS.get_mut().unwrap() };
             creds.token = token.clone();
+            trace!("Writing new account creds to {:?}", CredsConfig::path());
             creds.save()?;
             println!("Except for this device, the new token has been saved.")
         }

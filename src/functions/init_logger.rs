@@ -1,4 +1,4 @@
-use log::LevelFilter;
+use log::*;
 
 pub fn init_logger(level: LevelFilter) {
     env_logger::Builder::new()
@@ -7,4 +7,5 @@ pub fn init_logger(level: LevelFilter) {
         .format_target(false)
         .format_module_path(false)
         .init();
+    trace!("Logger started.")
 }

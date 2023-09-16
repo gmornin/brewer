@@ -1,3 +1,4 @@
+use log::*;
 use std::io::{stdin, stdout, Write};
 
 pub fn prompt(msg: &str) -> String {
@@ -5,5 +6,6 @@ pub fn prompt(msg: &str) -> String {
     stdout().flush().unwrap();
     let mut s = String::new();
     stdin().read_line(&mut s).expect("could not read input");
+    trace!("Value input recieved.");
     s
 }
