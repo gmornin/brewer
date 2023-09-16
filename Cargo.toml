@@ -13,6 +13,7 @@ serde = { version = "1.0", features = ["derive"]}
 log = "0.4"
 serde_json = "1.0"
 env_logger = "0.10"
+chrono = "0.4"
 
 command_macro = { path = "macros/command_macro" }
 command_macro_derive = { path = "macros/command_macro_derive" }

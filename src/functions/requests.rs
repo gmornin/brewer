@@ -68,9 +68,9 @@ pub fn get<R: DeserializeOwned>(url: &str) -> Result<R, RequestError> {
             "https"
         }
     );
-    debug!("{SENDING} with GET");
+    debug!("{SENDING} with GET to {url}");
     let res = reqwest::blocking::Client::new()
-        .post(&url)
+        .get(&url)
         .header(
             USER_AGENT,
             &format!(

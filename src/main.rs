@@ -15,7 +15,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     brewer::load()?;
 
     trace!("Running command {args:?}");
-    args.run().unwrap();
+
+    if args.run().is_err() && !args.verbose {
+        error!("Command exited unsuccessfully, run with `-v` for more debug info.");
+    }
 
     Ok(())
 }

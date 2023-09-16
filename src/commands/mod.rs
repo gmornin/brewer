@@ -34,13 +34,15 @@ pub enum TopLevelSubcommands {
     Login(Login),
     Logout(Logout),
     Regen(Regen),
+
+    Ls(Ls),
 }
 
 impl TopLevel {
     pub fn run(&self) -> Result<(), Box<dyn Error>> {
         HTTP.set(self.http).unwrap();
 
-        self.subcommand.run().unwrap();
+        self.subcommand.run()?;
 
         Ok(())
     }

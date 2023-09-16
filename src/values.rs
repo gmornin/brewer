@@ -8,6 +8,7 @@ use crate::structs::CredsConfig;
 pub static HTTP: OnceLock<bool> = OnceLock::new();
 pub static mut CREDS: OnceLock<CredsConfig> = OnceLock::new();
 pub static mut INSTANCE: OnceLock<String> = OnceLock::new();
+pub static BASE_PATH: OnceLock<String> = OnceLock::new();
 
 pub mod exit_codes {
     use std::process;

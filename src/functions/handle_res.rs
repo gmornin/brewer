@@ -4,7 +4,7 @@ use config_macro::ConfigTrait;
 use goodmorning_bindings::services::v1::{V1Error, V1Response};
 use log::*;
 
-use crate::{structs::CredsConfig, CREDS, INSTANCE};
+use crate::{functions::diritems_tostring, structs::CredsConfig, CREDS, INSTANCE};
 
 use super::duration_as_string;
 
@@ -112,7 +112,7 @@ pub fn v1_handle(res: &V1Response) -> Result<(), Box<dyn Error>> {
         V1Response::Triggered => println!("Trigger event has been ran."),
         V1Response::Revoked => println!("Trigger revoked."),
         V1Response::Overwritten => println!("File overwritten successfully."),
-        V1Response::DirContent { content } => todo!(),
+        V1Response::DirContent { content } => println!("{}", diritems_tostring(content)),
         V1Response::VisibilityChanged => println!("Visibility changed successfully."),
         V1Response::FileItemCreated => println!("File item created successfully."),
         V1Response::FileItemDeleted => println!("File item deleted successfully."),

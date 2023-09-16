@@ -1,10 +1,4 @@
-mod register;
-pub use register::*;
-mod version;
-pub use version::*;
-mod login;
-pub use login::*;
-mod logout;
-pub use logout::*;
-mod regen;
-pub use regen::*;
+mod account;
+pub use account::*;
+mod fs;
+pub use fs::*;
