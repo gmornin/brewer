@@ -22,7 +22,7 @@ pub struct Login {
     #[argp(positional)]
     /// Instance domain or IP.
     pub instance: String,
-    #[argp(option, default = "crate::functions::read_pw()")]
+    #[argp(option, default = "crate::functions::read_pw()", short = 'p')]
     /// You will be prompted to enter your password securely if you skip this option.
     pub password: String,
 }

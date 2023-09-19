@@ -2,7 +2,7 @@ use std::error::Error;
 
 use argp::FromArgs;
 use command_macro::CommandTrait;
-use goodmorning_bindings::services::v1::{V1Response, V1TokenPassword};
+use goodmorning_bindings::services::v1::{V1Response, V1TokenOnly};
 use log::*;
 
 use crate::{
@@ -13,15 +13,11 @@ use crate::{
 
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(FromArgs)]
-#[argp(subcommand, name = "regen")]
-/// Regenerate token, invalidating all other logins.
-pub struct Regen {
-    #[argp(option, default = "crate::functions::read_pw()", short = 'p')]
-    /// You will be prompted to enter your password securely if you skip this option.
-    pub password: String,
-}
+#[argp(subcommand, name = "verify")]
+/// Resend verification email.
+pub struct Verify {}
 
-impl CommandTrait for Regen {
+impl CommandTrait for Verify {
     fn run(&self) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {
@@ -29,12 +25,11 @@ impl CommandTrait for Regen {
         }
 
         trace!("Logged in, proceeding with regenerating token.");
-        let body = V1TokenPassword {
+        let body = V1TokenOnly {
             token: creds.token.clone(),
-            password: self.password.clone(),
         };
 
-        let url = get_url("/api/accounts/v1/regeneratetoken");
+        let url = get_url("/api/accounts/v1/resend-verify");
 
         let res: V1Response = post(&url, body)?;
         v1_handle(&res)?;

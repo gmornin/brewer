@@ -1,7 +1,7 @@
 use log::*;
 use std::io::{stdin, stdout, Write};
 
-use crate::exit_codes::doas_failed;
+use crate::{exit_codes::doas_failed, YES};
 
 pub fn prompt(msg: &str) -> String {
     print!("{msg}:\n> ");
@@ -13,6 +13,10 @@ pub fn prompt(msg: &str) -> String {
 }
 
 pub fn doasisay(msg: &str) {
+    if *YES.get().unwrap() {
+        return;
+    }
+
     if prompt(&format!("You are about to carry out `{msg}`.\nIf you understand that this is a potentially dangerous action and wish to proceed,\ntype \"Yes, do as I say\" below")).to_lowercase().as_str() != "yes, do as i say" {
         doas_failed()
     }

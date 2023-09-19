@@ -2,7 +2,7 @@ use std::error::Error;
 
 use argp::FromArgs;
 use command_macro::CommandTrait;
-use goodmorning_bindings::services::v1::{V1Response, V1TokenPassword};
+use goodmorning_bindings::services::v1::{V1ChangeEmail, V1Response};
 use log::*;
 
 use crate::{
@@ -13,30 +13,34 @@ use crate::{
 
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(FromArgs)]
-#[argp(subcommand, name = "delete")]
-/// Delete an existing GM account.
-pub struct Delete {
+#[argp(subcommand, name = "email")]
+/// Change account email address.
+pub struct Email {
+    #[argp(positional)]
+    /// Your new linked email address.
+    pub new: String,
     #[argp(option, default = "crate::functions::read_pw()", short = 'p')]
     /// You will be prompted to enter your password securely if you skip this option.
     pub password: String,
 }
 
-impl CommandTrait for Delete {
+impl CommandTrait for Email {
     fn run(&self) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {
             loggedin_only()
         }
-        trace!("Logged in, proceeding with deletion.");
 
-        doasisay("delete account");
+        doasisay("changing email");
 
-        let body = V1TokenPassword {
+        trace!("Logged in, proceeding with regenerating token.");
+        let body = V1ChangeEmail {
             token: creds.token.clone(),
             password: self.password.clone(),
+            new: self.new.clone(),
         };
 
-        let url = get_url("/api/accounts/v1/delete");
+        let url = get_url("/api/accounts/v1/change-email");
 
         let res: V1Response = post(&url, body)?;
         v1_handle(&res)?;

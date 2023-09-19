@@ -27,8 +27,8 @@ pub fn duration_as_string(mut secs: u64) -> String {
     } else if out.len() == 1 {
         out[0].clone()
     } else {
-        let len = out.len();
-        out[len - 2] = format!("{} and {}", out[out.len() - 2], out.last().unwrap());
+        let last = out.pop().unwrap();
+        *out.last_mut().unwrap() = format!("{} and {}", out.last().unwrap(), last);
         out.join(", ")
     }
 }

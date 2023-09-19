@@ -2,7 +2,7 @@ use std::error::Error;
 
 use argp::FromArgs;
 use command_macro::CommandTrait;
-use goodmorning_bindings::services::v1::{V1Response, V1TokenPassword};
+use goodmorning_bindings::services::v1::{V1ChangePassword, V1Response};
 use log::*;
 
 use crate::{
@@ -13,15 +13,18 @@ use crate::{
 
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(FromArgs)]
-#[argp(subcommand, name = "regen")]
-/// Regenerate token, invalidating all other logins.
-pub struct Regen {
-    #[argp(option, default = "crate::functions::read_pw()", short = 'p')]
+#[argp(subcommand, name = "pwd")]
+/// Change account password.
+pub struct Pwd {
+    #[argp(option, default = "crate::functions::read_pw_old()", short = 'p')]
     /// You will be prompted to enter your password securely if you skip this option.
-    pub password: String,
+    pub old: String,
+    #[argp(option, default = "crate::functions::read_pw_confirm()", short = 'n')]
+    /// You will be prompted to enter your password securely if you skip this option.
+    pub new: String,
 }
 
-impl CommandTrait for Regen {
+impl CommandTrait for Pwd {
     fn run(&self) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {
@@ -29,12 +32,13 @@ impl CommandTrait for Regen {
         }
 
         trace!("Logged in, proceeding with regenerating token.");
-        let body = V1TokenPassword {
+        let body = V1ChangePassword {
             token: creds.token.clone(),
-            password: self.password.clone(),
+            old: self.old.clone(),
+            new: self.new.clone(),
         };
 
-        let url = get_url("/api/accounts/v1/regeneratetoken");
+        let url = get_url("/api/accounts/v1/change-password");
 
         let res: V1Response = post(&url, body)?;
         v1_handle(&res)?;

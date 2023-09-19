@@ -17,6 +17,9 @@ pub struct TopLevel {
     /// Show all workings.
     #[argp(switch, short = 'v', global)]
     pub verbose: bool,
+    /// Yes, do as I say.
+    #[argp(switch, short = 'y', global)]
+    pub yes: bool,
     /// Use unencrypted http traffic instead of https.
     #[argp(switch, global)]
     pub http: bool,
@@ -36,6 +39,10 @@ pub enum TopLevelSubcommands {
     Regen(Regen),
     Delete(Delete),
     Status(Status),
+    Rename(Rename),
+    Pwd(Pwd),
+    Email(Email),
+    Verify(Verify),
 
     Ls(Ls),
 }
@@ -43,6 +50,7 @@ pub enum TopLevelSubcommands {
 impl TopLevel {
     pub fn run(&self) -> Result<(), Box<dyn Error>> {
         HTTP.set(self.http).unwrap();
+        YES.set(self.yes).unwrap();
 
         self.subcommand.run()?;
 
