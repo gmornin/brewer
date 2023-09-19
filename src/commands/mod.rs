@@ -34,6 +34,8 @@ pub enum TopLevelSubcommands {
     Login(Login),
     Logout(Logout),
     Regen(Regen),
+    Delete(Delete),
+    Status(Status),
 
     Ls(Ls),
 }

@@ -8,3 +8,7 @@ mod logout;
 pub use logout::*;
 mod regen;
 pub use regen::*;
+mod delete;
+pub use delete::*;
+mod status;
+pub use status::*;

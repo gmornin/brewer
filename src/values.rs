@@ -34,6 +34,14 @@ pub mod exit_codes {
         error!("Argument `{msg}` is required but not provided.");
         process::exit(40000)
     }
+
+    // 500s: error/aborted
+    //
+    /// When "do as I say" failed.
+    pub fn doas_failed() {
+        error!("Aborted: user did not enter confirm message.");
+        process::exit(50000)
+    }
 }
 
 pub fn load() -> Result<(), Box<dyn Error>> {

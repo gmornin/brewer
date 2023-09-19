@@ -21,7 +21,7 @@ pub fn ev1_handle(err: &V1Error) -> Result<(), Box<dyn Error>> {
             creds.clear();
             trace!("Writing changes to {:?}", CredsConfig::path());
             creds.save()?;
-            println!("The user token you provided is invalid,\nit is likely that someone (hopefully you) has regenerate the token on another device,\nwhich invalidates all existing sessions, including this one.\nPlease run the login command again to gain access to your account.")
+            println!("The user token you provided is invalid,\nit is likely that someone (hopefully you) has regenerate the token on another device,\nwhich invalidates all existing sessions, including this one.\nPlease run the login command to gain access to your account.")
         },
         V1Error::NotVerified => println!("Your email address has not been verified,\nthis action requires a verified account."),
         V1Error::InvalidUsername => println!("The username you just provided is invalid,\ndouble check if you've made a typo."),
@@ -92,7 +92,7 @@ pub fn v1_handle(res: &V1Response) -> Result<(), Box<dyn Error>> {
             };
             trace!("Writing account creds to {:?}", CredsConfig::path());
             creds.save()?;
-            println!("you are now logged in");
+            println!("You are now logged in");
         }
         V1Response::RegenerateToken { token } => {
             println!("Token regenerated, all other sessions are invalidated.");

@@ -4,7 +4,7 @@ use log::*;
 
 use super::prompt;
 
-pub fn instance_or_exit() -> String {
+pub fn get_instance() -> String {
     match unsafe { INSTANCE.get() } {
         Some(i) if !i.is_empty() => {
             trace!("Instance already contains value, skipping.");

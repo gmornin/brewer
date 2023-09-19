@@ -4,7 +4,7 @@ use log::*;
 use reqwest::header::USER_AGENT;
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::{functions::instance_or_exit, HTTP};
+use crate::{functions::get_instance, HTTP};
 
 const INSECURE_WARN: &str = "This request is sent using the insecure http protocol";
 const SENDING: &str = "Sending request";
@@ -140,5 +140,5 @@ impl Display for RequestError {
 impl Error for RequestError {}
 
 pub fn get_url(path: &str) -> String {
-    format!("{}{path}", instance_or_exit())
+    format!("{}{path}", get_instance())
 }
