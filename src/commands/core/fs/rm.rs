@@ -13,22 +13,22 @@ use crate::{
 
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(FromArgs)]
-#[argp(subcommand, name = "touch")]
-/// Create new file.
-pub struct Touch {
+#[argp(subcommand, name = "rm")]
+/// Remove file system items.
+pub struct Rm {
     #[argp(positional)]
-    /// The path of new file.
+    /// The path to remove.
     pub path: String,
 }
 
-impl CommandTrait for Touch {
+impl CommandTrait for Rm {
     fn run(&self) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {
             loggedin_only()
         }
 
-        trace!("Logged in, proceeding with creating file.");
+        trace!("Logged in, proceeding with deleting file system item.");
 
         let path = self.path.trim_matches('/');
         let body = V1PathOnly {
@@ -36,7 +36,7 @@ impl CommandTrait for Touch {
             path: path.to_string(),
         };
 
-        let url = get_url("/api/storage/v1/touch");
+        let url = get_url("/api/storage/v1/delete");
 
         let res: V1Response = post(&url, body)?;
         v1_handle(&res)?;

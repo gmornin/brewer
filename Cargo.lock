@@ -107,6 +107,7 @@ version = "0.1.0"
 dependencies = [
  "argp",
  "chrono",
+ "cmdarg_macro_derive",
  "command_macro",
  "command_macro_derive",
  "config_macro",
@@ -159,6 +160,15 @@ dependencies = [
  "num-traits",
  "wasm-bindgen",
  "windows-targets",
+]
+
+[[package]]
+name = "cmdarg_macro_derive"
+version = "0.1.0"
+dependencies = [
+ "argp",
+ "quote",
+ "syn 2.0.32",
 ]
 
 [[package]]

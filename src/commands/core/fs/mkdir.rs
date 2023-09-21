@@ -13,22 +13,22 @@ use crate::{
 
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(FromArgs)]
-#[argp(subcommand, name = "touch")]
-/// Create new file.
-pub struct Touch {
+#[argp(subcommand, name = "mkdir")]
+/// Create new directory.
+pub struct Mkdir {
     #[argp(positional)]
-    /// The path of new file.
+    /// The path of new directory.
     pub path: String,
 }
 
-impl CommandTrait for Touch {
+impl CommandTrait for Mkdir {
     fn run(&self) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {
             loggedin_only()
         }
 
-        trace!("Logged in, proceeding with creating file.");
+        trace!("Logged in, proceeding with creating directory.");
 
         let path = self.path.trim_matches('/');
         let body = V1PathOnly {
@@ -36,7 +36,7 @@ impl CommandTrait for Touch {
             path: path.to_string(),
         };
 
-        let url = get_url("/api/storage/v1/touch");
+        let url = get_url("/api/storage/v1/mkdir");
 
         let res: V1Response = post(&url, body)?;
         v1_handle(&res)?;

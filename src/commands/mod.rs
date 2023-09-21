@@ -48,6 +48,10 @@ pub enum TopLevelSubcommands {
     Mv(Mv),
     Cp(Cp),
     Touch(Touch),
+    Rm(Rm),
+    Exist(Exist),
+    Mkdir(Mkdir),
+    Vis(Vis),
 }
 
 impl TopLevel {
