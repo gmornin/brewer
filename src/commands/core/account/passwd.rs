@@ -13,9 +13,9 @@ use crate::{
 
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(FromArgs)]
-#[argp(subcommand, name = "pwd")]
+#[argp(subcommand, name = "passwd")]
 /// Change account password.
-pub struct Pwd {
+pub struct Passwd {
     #[argp(option, default = "crate::functions::read_pw_old()", short = 'p')]
     /// You will be prompted to enter your password securely if you skip this option.
     pub old: String,
@@ -24,7 +24,7 @@ pub struct Pwd {
     pub new: String,
 }
 
-impl CommandTrait for Pwd {
+impl CommandTrait for Passwd {
     fn run(&self) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {

@@ -28,7 +28,7 @@ impl CommandTrait for Ls {
             loggedin_only()
         }
 
-        trace!("Logged in, proceeding with regenerating token.");
+        trace!("Logged in, proceeding with listing directory items.");
 
         let path = self.path.trim_matches('/');
         let url = get_url(&format!(

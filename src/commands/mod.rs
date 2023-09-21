@@ -40,11 +40,14 @@ pub enum TopLevelSubcommands {
     Delete(Delete),
     Status(Status),
     Rename(Rename),
-    Pwd(Pwd),
+    Passwd(Passwd),
     Email(Email),
     Verify(Verify),
 
     Ls(Ls),
+    Mv(Mv),
+    Cp(Cp),
+    Touch(Touch),
 }
 
 impl TopLevel {
