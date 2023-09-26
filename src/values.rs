@@ -12,7 +12,7 @@ pub static mut INSTANCE: OnceLock<String> = OnceLock::new();
 pub static BASE_PATH: OnceLock<String> = OnceLock::new();
 
 pub mod exit_codes {
-    use std::process;
+    use std::{path::Path, process};
 
     use log::error;
 
@@ -42,6 +42,15 @@ pub mod exit_codes {
     pub fn doas_failed() {
         error!("Aborted: user did not enter confirm message.");
         process::exit(50000)
+    }
+
+    /// .ignore file adding failed
+    pub fn ignore_add_failed(path: &Path) {
+        error!(
+            "Aborted: could not add .ignore file at `{}`.",
+            path.to_string_lossy().to_string()
+        );
+        process::exit(50001)
     }
 }
 
