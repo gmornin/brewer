@@ -52,6 +52,7 @@ pub enum TopLevelSubcommands {
     Exist(Exist),
     Mkdir(Mkdir),
     Vis(Vis),
+    Clone(Clone),
 }
 
 impl TopLevel {

@@ -1,8 +1,19 @@
-use std::path::{Path, PathBuf};
+use std::{
+    error::Error,
+    fs,
+    io::{self, Write},
+    path::{Path, PathBuf},
+};
 
 use goodmorning_bindings::services::v1::{V1DirTreeItem, V1DirTreeNode};
+use log::*;
+use serde::{Deserialize, Serialize};
 
-use crate::functions::DEFAULT_VIS;
+use crate::{
+    exit_codes::{bad_clone_json, download_failed},
+    functions::{download, DEFAULT_VIS},
+    CREDS, OUTPUT_DIR,
+};
 
 const DIR_SIZE: u64 = 0;
 
@@ -17,12 +28,15 @@ pub struct TreeDiff {
 #[derive(Debug, PartialEq, Eq)]
 pub struct TreeDiffItem {
     pub size: u64,
-    pub path: PathBuf,
+    pub path: String,
 }
 
 impl TreeDiffItem {
     fn from(path: PathBuf, size: u64) -> Self {
-        Self { size, path }
+        Self {
+            size,
+            path: path.to_string_lossy().to_string(),
+        }
     }
 }
 
@@ -37,17 +51,120 @@ impl TreeDiff {
             deleted: cmp_del_recurse(old, new, PathBuf::new().as_path()),
         }
     }
+
+    pub fn pull(&self, head: &FsHead, instance: &str, owned: bool) -> Result<(), Box<dyn Error>> {
+        let mut stdout = io::stdout();
+        let output = OUTPUT_DIR.get().unwrap();
+
+        if !self.deleted.is_empty() {
+            let total = total(&self.deleted);
+            let mut counting = 0;
+            for item in self.deleted.iter() {
+                print!(
+                    "\rDeleting objects ({counting}/{total})... {}%",
+                    counting * 100 / total
+                );
+                stdout.flush().unwrap();
+
+                let display_path = item.path.trim_matches('/');
+                let path = output.join(display_path);
+
+                if fs::metadata(&path)?.is_dir() {
+                    trace!("Deleting directory {display_path}.");
+                    fs::remove_dir_all(path)?;
+                } else {
+                    trace!("Deleting file {display_path}.");
+                    fs::remove_file(path)?;
+                }
+
+                counting += item.size;
+            }
+            println!("\rDeleting objects ({counting}/{total}), done. ");
+        }
+
+        if !self.created_dirs.is_empty() {
+            for item in self.created_dirs.iter() {
+                let display_path = item.path.trim_matches('/');
+                let path = output.join(display_path);
+                trace!("Creating directory {display_path}.");
+                fs::create_dir(path)?;
+            }
+        }
+
+        if !(self.created.is_empty() && self.changed.is_empty()) {
+            let creds = unsafe { CREDS.get().unwrap() };
+            let total = total(&self.created) + total(&self.changed);
+            let mut counting = 0;
+
+            for item in self.changed.iter().chain(self.created.iter()) {
+                print!(
+                    "\rDownloading objects ({counting}/{total})... {}%",
+                    counting * 100 / total
+                );
+                stdout.flush().unwrap();
+
+                let remote_path = format!(
+                    "{}/{}",
+                    head.path.trim_matches('/'),
+                    item.path.trim_matches('/')
+                );
+                let url = if owned {
+                    format!(
+                        "{instance}/api/storage/v1/file/{}/{remote_path}",
+                        creds.token
+                    )
+                } else {
+                    format!(
+                        "{instance}/api/usercontent/v1/file/id/{}/{remote_path}",
+                        head.id
+                    )
+                };
+
+                let display_path = item.path.trim_matches('/');
+                let path = output.join(display_path);
+
+                if download(&url, &path).is_err() {
+                    println!();
+                    download_failed(display_path);
+                }
+
+                counting += item.size;
+            }
+
+            println!("\rDownloading objects ({counting}/{total}), done. ");
+        }
+
+        Ok(())
+    }
 }
+
+fn total(items: &[TreeDiffItem]) -> u64 {
+    items.iter().map(|item| item.size).sum()
+}
+
+// fn get_path(path: &Path) -> PathBuf {
+//     OUTPUT_DIR.get().unwrap().join(if path.starts_with("/") {
+//         path.strip_prefix("/").unwrap()
+//     } else {
+//         &path
+//     })
+// }
 
 impl From<&str> for TreeDiffItem {
     fn from(value: &str) -> Self {
-        PathBuf::from(value).into()
+        Self {
+            size: 0,
+            path: value.to_string(),
+        }
     }
 }
 
 impl From<PathBuf> for TreeDiffItem {
     fn from(value: PathBuf) -> Self {
-        Self::from(value, 0)
+        Self {
+            size: 0,
+            path: value.to_string_lossy().to_string(),
+        }
     }
 }
 
@@ -207,5 +324,27 @@ fn file_meta(item: &V1DirTreeItem) -> (u64, u64) {
             size,
         } => (*last_modified, *size),
         V1DirTreeItem::Dir { .. } => unreachable!("expected file only"),
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FsHead {
+    pub path: String,
+    pub id: i64,
+}
+
+impl From<&str> for FsHead {
+    fn from(value: &str) -> Self {
+        match serde_json::from_str::<Self>(value) {
+            Ok(h) => Self {
+                path: html_escape::decode_html_entities(&h.path).to_string(),
+                ..h
+            },
+            Err(e) => {
+                debug!("Error deserialising {e}");
+                bad_clone_json();
+                unreachable!()
+            }
+        }
     }
 }

@@ -8,7 +8,7 @@ use std::{
 use log::*;
 use serde::{de::DeserializeOwned, Serialize};
 
-const NAME: &str = "brewer";
+pub const NAME: &str = "brewer";
 
 pub trait ConfigTrait
 where
