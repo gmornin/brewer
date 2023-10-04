@@ -1,18 +1,21 @@
 use std::{
     error::Error,
     fmt::Display,
-    fs,
+    fs::{self},
     io::{self, Write},
     path::{Path, PathBuf},
 };
 
-use goodmorning_bindings::services::v1::{V1DirTreeItem, V1DirTreeNode};
+use goodmorning_bindings::services::v1::{
+    V1DirTreeItem, V1DirTreeNode, V1Error, V1PathOnly, V1Response,
+};
 use log::*;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    exit_codes::{bad_clone_json, download_failed},
-    functions::{download, DEFAULT_VIS},
+    exit_codes::{bad_clone_json, download_failed, sync_failed, unexpected_response},
+    functions::{download, get_url, post, upload, v1_handle, DEFAULT_VIS},
     CREDS, OUTPUT_DIR,
 };
 
@@ -30,6 +33,22 @@ pub struct TreeDiff {
 pub struct TreeDiffItem {
     pub size: u64,
     pub path: String,
+}
+
+#[allow(clippy::incorrect_partial_ord_impl_on_ord_type)]
+impl PartialOrd for TreeDiffItem {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(match self.path.len().partial_cmp(&other.path.len()) {
+            Some(cmp) => cmp,
+            None => self.path.cmp(&other.path),
+        })
+    }
+}
+
+impl Ord for TreeDiffItem {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -94,9 +113,9 @@ impl TreeDiffItem {
     }
 }
 
-fn sort(vec: &mut [TreeDiffItem]) {
-    vec.sort_by_key(|item| item.path.to_string());
-}
+// fn sort(vec: &mut [TreeDiffItem]) {
+//     vec.sort_by_key(|item| item.path.to_string());
+// }
 
 impl TreeDiff {
     pub fn is_empty(&self) -> bool {
@@ -122,10 +141,10 @@ impl TreeDiff {
     }
 
     pub fn sort(&mut self) {
-        sort(&mut self.created);
-        sort(&mut self.created_dirs);
-        sort(&mut self.changed);
-        sort(&mut self.deleted);
+        self.created.sort();
+        self.created_dirs.sort();
+        self.changed.sort();
+        self.deleted.sort();
     }
 
     pub fn conflict(&self, remote: &TreeDiff) -> DiffConflicts {
@@ -307,6 +326,116 @@ impl TreeDiff {
             }
 
             println!("\rDownloading objects ({counting}/{total}), done. ");
+        }
+
+        Ok(())
+    }
+
+    pub fn push(&self, head: &FsHead) -> Result<(), Box<dyn Error>> {
+        let mut stdout = io::stdout();
+        let creds = unsafe { CREDS.get().unwrap() };
+
+        if !self.deleted.is_empty() {
+            let total = self.deleted.len();
+            let url = get_url("/api/storage/v1/delete");
+            for (i, item) in self.deleted.iter().enumerate() {
+                trace!("Deleting {}.", item.path);
+                print!("\rDeleting objects ({}/{total})...", i);
+                stdout.flush().unwrap();
+
+                let body = V1PathOnly {
+                    token: creds.token.clone(),
+                    path: format!("{}/{}", head.path, item.path.clone()),
+                };
+
+                let res: V1Response = match post(&url, body) {
+                    Ok(res) => res,
+                    Err(e) => {
+                        sync_failed(e.into());
+                        unreachable!()
+                    }
+                };
+
+                match res {
+                    V1Response::FileItemDeleted => trace!("Deleted {}", item.path),
+                    V1Response::Error {
+                        kind: V1Error::FileNotFound,
+                    } => debug!("Delete {} returns file not found.", item.path),
+                    res => {
+                        v1_handle(&res).unwrap();
+                        unexpected_response("FileItemDeleted", res)
+                    }
+                }
+            }
+
+            println!("\rDeleting objects ({total}/{total}), done.")
+        }
+
+        if !self.created_dirs.is_empty() {
+            let total = self.deleted.len();
+            let url = get_url("/api/storage/v1/mkdir");
+            for (i, item) in self.created_dirs.iter().enumerate() {
+                trace!("Creating directory {}.", item.path);
+                print!("\rCreating directories ({}/{total})...", i);
+                stdout.flush().unwrap();
+
+                let body = V1PathOnly {
+                    token: creds.token.clone(),
+                    path: format!("{}/{}", head.path, item.path.clone()),
+                };
+
+                let res: V1Response = match post(&url, body) {
+                    Ok(res) => res,
+                    Err(e) => {
+                        sync_failed(e.into());
+                        unreachable!()
+                    }
+                };
+
+                match res {
+                    V1Response::FileItemCreated => trace!("Created directory {}", item.path),
+                    res => {
+                        v1_handle(&res).unwrap();
+                        unexpected_response("FileItemCreated", res)
+                    }
+                }
+            }
+
+            println!("\rCreating directories ({total}/{total}), done.")
+        }
+
+        if !(self.changed.is_empty() && self.created.is_empty()) {
+            let total = total(&self.changed) + total(&self.created);
+            let mut count = 0;
+
+            for item in self.changed.iter().chain(self.created.iter()) {
+                trace!("Uploading item {}.", item.path);
+                print!("\rUploading changes ({}/{total})...", count);
+                let url = get_url(&format!(
+                    "/api/storage/v1/upload-overwrite/{}/{}/{}",
+                    creds.token, head.path, item.path
+                ));
+
+                let res: V1Response = match upload(&url, &PathBuf::from(&item.path)) {
+                    Ok(res) => res,
+                    Err(e) => {
+                        sync_failed(e.into());
+                        unreachable!()
+                    }
+                };
+
+                match res {
+                    V1Response::FileItemCreated => trace!("Uploaded file {}", item.path),
+                    res => {
+                        v1_handle(&res).unwrap();
+                        unexpected_response("FileItemCreated", res)
+                    }
+                }
+
+                count += item.size;
+            }
+
+            println!("\rUploading changes ({total}/{total})...");
         }
 
         Ok(())

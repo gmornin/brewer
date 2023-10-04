@@ -19,6 +19,7 @@ pub const EXPECT: &str =
 pub mod exit_codes {
     use std::{error::Error, path::Path, process};
 
+    use goodmorning_bindings::services::v1::V1Response;
     use log::error;
 
     // 300s: operation not allowed
@@ -28,9 +29,17 @@ pub mod exit_codes {
         error!("3000 This operation is not allowed when logged in.");
         process::exit(3000)
     }
+
+    /// This operation is only allowed when logged in
     pub fn loggedin_only() {
         error!("3001 This operation can only be done when logged in.");
         process::exit(3001)
+    }
+
+    /// you don't have the permission to do this action
+    pub fn permission_denied() {
+        error!("3002 You don't have the permission to do this action.");
+        process::exit(3002)
     }
 
     // 400s: not found
@@ -41,9 +50,16 @@ pub mod exit_codes {
         process::exit(4000)
     }
 
+    /// gmrepo.json is missing
     pub fn missing_repo_json() {
         error!("4001 Cannot find gmrepo.json, is this a cloned repo?");
         process::exit(4001)
+    }
+
+    /// file not found
+    pub fn file_not_found(path: &Path) {
+        error!("4002 File not found at {}", path.to_string_lossy());
+        process::exit(4002)
     }
 
     // 500s: error/aborted
@@ -90,13 +106,13 @@ pub mod exit_codes {
         process::exit(5005)
     }
 
-    // push or pull fail
+    /// push or pull fail
     pub fn sync_failed(e: Box<dyn Error>) {
         error!("5006 Syncing failed with error {e}, aborting.");
         process::exit(5006)
     }
 
-    // failed to create .gmignore
+    /// failed to create .gmignore
     pub fn create_gmignore_fail(e: Box<dyn Error>, path: &Path) {
         error!(
             "5007 Failed to create .gmignore in path {} with error {e}",
@@ -109,6 +125,12 @@ pub mod exit_codes {
     pub fn repo_conflict() {
         error!("5008 Aborted action as there is a conflict between local and remote.");
         process::exit(5008)
+    }
+
+    /// the recieved response does not match expected
+    pub fn unexpected_response(expect: &str, got: V1Response) {
+        error!("5009 Response rematch, expects {expect}, got {got:?}");
+        process::exit(5009)
     }
 }
 

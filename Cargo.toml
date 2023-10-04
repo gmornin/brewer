@@ -19,6 +19,7 @@ html-escape = "0.2"
 serde-inline-default = "0.1"
 serde_default = "0.1"
 dirs = "5.0"
+# ansi_term = "0.12"
 
 command_macro = { path = "macros/command_macro" }
 command_macro_derive = { path = "macros/command_macro_derive" }
@@ -27,7 +28,6 @@ config_macro_derive = { path = "macros/config_macro_derive" }
 cmdarg_macro_derive = { path = "macros/cmdarg_macro_derive" }
 
 goodmorning-bindings = { git = "https://github.com/gmornin/rust-bindings", rev = "6b5dd7f" }
-ansi_term = "0.12.1"
 
 [features]
 default = ["debug"]

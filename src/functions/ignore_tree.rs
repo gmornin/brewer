@@ -23,7 +23,7 @@ pub fn ignore_tree(path: &Path) -> V1DirTreeNode {
         path.to_string_lossy().to_string()
     );
     let mut builder = GitignoreBuilder::new(path);
-    builder.add_line(None, "gmrepo.json").unwrap();
+    builder.add_line(None, ".gmrepo.json").unwrap();
     V1DirTreeNode {
         name: path
             .file_name()

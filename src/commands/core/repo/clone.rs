@@ -11,7 +11,7 @@ use goodmorning_bindings::services::v1::{V1DirTreeNode, V1Response};
 use log::*;
 
 use crate::{
-    exit_codes::{bad_clone_json, output_path_occupied, sync_failed},
+    exit_codes::{bad_clone_json, output_path_occupied, sync_failed, unexpected_response},
     functions::{get, get_string, get_url_instance, url_domain, v1_handle, DEFAULT_VIS},
     structs::{FsHead, GmIgnoreDefault, Repo, TreeDiff},
     BASE_PATH, CREDS, OUTPUT_DIR,
@@ -85,8 +85,10 @@ impl CommandTrait for Clone {
 
         let tree = match res {
             V1Response::Tree { content } => content,
-            _ => {
-                return v1_handle(&res);
+            res => {
+                v1_handle(&res).unwrap();
+                unexpected_response("Tree", res);
+                unreachable!()
             }
         };
 

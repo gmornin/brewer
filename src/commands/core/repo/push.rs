@@ -9,7 +9,7 @@ use command_macro::CommandTrait;
 use goodmorning_bindings::services::v1::V1Response;
 
 use crate::{
-    exit_codes::{repo_conflict, sync_failed, unexpected_response},
+    exit_codes::{permission_denied, repo_conflict, sync_failed, unexpected_response},
     functions::{get, get_url_instance, ignore_tree, v1_handle},
     structs::{FsHead, Repo, TreeDiff},
     BASE_PATH, CREDS, OUTPUT_DIR,
@@ -17,29 +17,28 @@ use crate::{
 
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(FromArgs)]
-#[argp(subcommand, name = "pull")]
-/// Pull updates from remote.
-pub struct Pull {
+#[argp(subcommand, name = "push")]
+/// Push updates to remote.
+pub struct Push {
     #[argp(switch, short = 'f')]
     /// Overwrite conflict files
     pub force: bool,
 }
 
-impl CommandTrait for Pull {
+impl CommandTrait for Push {
     fn run(&self) -> Result<(), Box<dyn Error>> {
         let mut repo = Repo::load();
         let creds = unsafe { CREDS.get().unwrap() };
-        let own = repo.instance == creds.instance && repo.user == creds.id;
+        if repo.instance != creds.instance || repo.user != creds.id {
+            println!("You must be the owner of this repository to push updates to it.");
+            permission_denied()
+        }
 
         let mut stdout = io::stdout();
         print!("Resolving objects");
         stdout.flush().unwrap();
         let url = get_url_instance(
-            &if own {
-                format!("/api/storage/v1/tree/{}/{}", creds.token, repo.path)
-            } else {
-                format!("/api/usercontent/v1/tree/id/{}/{}", repo.user, repo.path)
-            },
+            &format!("/api/storage/v1/tree/{}/{}", creds.token, repo.path),
             &repo.instance,
         );
         let res: V1Response = get(&url)?;
@@ -55,12 +54,12 @@ impl CommandTrait for Pull {
         let fs_current = ignore_tree(&PathBuf::new());
 
         let remote_diff = TreeDiff::cmp(&repo.trees.remote, &remote_current);
-        if remote_diff.is_empty() {
-            println!("You are up to date.");
+        let fs_diff = TreeDiff::cmp(&repo.trees.fs, &fs_current);
+
+        if fs_diff.is_empty() {
+            println!("Remote is up to date.");
             return Ok(());
         }
-
-        let fs_diff = TreeDiff::cmp(&repo.trees.fs, &fs_current);
 
         let conflicts = remote_diff.conflict(&fs_diff);
 
@@ -73,7 +72,7 @@ impl CommandTrait for Pull {
         }
 
         let output = PathBuf::new();
-        println!("Pulling updates...");
+        println!("Pushing updates...");
         BASE_PATH.set(repo.path.to_string()).unwrap();
         OUTPUT_DIR.set(output.clone()).unwrap();
 
@@ -81,13 +80,23 @@ impl CommandTrait for Pull {
             path: repo.path.clone(),
             id: repo.user,
         };
-        if let Err(e) = remote_diff.pull(&head, &repo.instance, own) {
+
+        if let Err(e) = fs_diff.push(&head) {
             sync_failed(e);
         }
+
+        let res: V1Response = get(&url)?;
+        let remote_current = match res {
+            V1Response::Tree { content } => content,
+            _ => {
+                return v1_handle(&res);
+            }
+        };
         repo.trees.remote = remote_current;
+        repo.trees.fs = fs_current;
         repo.save(&output);
 
-        println!("All done, you are now up to date.");
+        println!("All done, updates are pushed to remote.");
         Ok(())
     }
 }

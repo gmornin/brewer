@@ -1,13 +1,25 @@
-use std::{env, error::Error, fmt::Display, fs::OpenOptions, io::Write, path::Path};
+use std::{
+    env,
+    error::Error,
+    fmt::Display,
+    fs::OpenOptions,
+    io::{self, Read, Write},
+    path::Path,
+};
 
 use log::*;
 use reqwest::{
+    blocking::multipart::{Form, Part},
     header::{self, HeaderValue, COOKIE, USER_AGENT},
     StatusCode,
 };
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::{exit_codes::bad_url, functions::get_instance, CREDS, DOWNLOAD_RETRIES, EXPECT, HTTP};
+use crate::{
+    exit_codes::{bad_url, file_not_found, sync_failed},
+    functions::get_instance,
+    CREDS, DOWNLOAD_RETRIES, EXPECT, HTTP,
+};
 
 const INSECURE_WARN: &str = "This request is sent using the insecure http protocol";
 const SENDING: &str = "Sending request";
@@ -132,6 +144,91 @@ pub fn get<R: DeserializeOwned>(url: &str) -> Result<R, RequestError> {
         }
     );
     let text = get_string(&url, false, false)?.0;
+    match serde_json::from_str(&text) {
+        Ok(out) => Ok(out),
+        Err(e) => {
+            error!("Deserialization failed");
+            info!("Server response: \n{}", text);
+            Err(RequestError::Deserialize {
+                url,
+                error: e,
+                content: text,
+            })
+        }
+    }
+}
+
+pub fn upload<R: DeserializeOwned>(url: &str, path: &Path) -> Result<R, RequestError> {
+    if !path.exists() {
+        error!("No file at {}", path.to_string_lossy());
+        file_not_found(path)
+    }
+
+    let url = format!(
+        "{}://{url}",
+        if *HTTP.get().unwrap() {
+            "http"
+        } else {
+            "https"
+        }
+    );
+
+    trace!("Starting upload for {} to {url}.", path.to_string_lossy());
+    let bytes = match (|| -> Result<Vec<u8>, io::Error> {
+        trace!("Reading file content.");
+        let mut file = OpenOptions::new().read(true).open(path)?;
+
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer)?;
+        Ok(buffer)
+    })() {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            sync_failed(e.into());
+            unreachable!()
+        }
+    };
+
+    let form = Form::new().part(
+        "file",
+        Part::bytes(bytes)
+            .file_name("filename.txt")
+            .mime_str("application/octet-stream")
+            .unwrap(),
+    );
+
+    trace!("Starting upload");
+
+    let res = reqwest::blocking::Client::new()
+        .post(&url)
+        .multipart(form)
+        .header(
+            USER_AGENT,
+            &format!(
+                "{} {} (git {})",
+                env!("CARGO_PKG_NAME"),
+                env!("CARGO_PKG_VERSION"),
+                env!("GIT_HASH")
+            ),
+        )
+        .send()
+        .map_err(|e| RequestError::Send {
+            url: url.to_string(),
+            error: e,
+        })?;
+
+    debug!(
+        "Recieved response status code {}.",
+        res.status().to_string()
+    );
+
+    let text = res.text().map_err(|e| RequestError::Send {
+        url: url.to_string(),
+        error: e,
+    })?;
+
+    trace!("Deserializing response.");
+
     match serde_json::from_str(&text) {
         Ok(out) => Ok(out),
         Err(e) => {

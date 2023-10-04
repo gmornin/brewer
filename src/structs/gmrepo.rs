@@ -37,12 +37,12 @@ impl Repo {
 
     pub fn save(&self, path: &Path) {
         let json = serde_json::to_string(self).unwrap();
-        trace!("Saving gmrepo.json.");
+        trace!("Saving .gmrepo.json.");
         let mut file = OpenOptions::new()
             .write(true)
             .truncate(true)
             .create(true)
-            .open(path.join("gmrepo.json"))
+            .open(path.join(".gmrepo.json"))
             .map_err(|e| sync_failed(e.into()))
             .unwrap();
         file.write_all(json.as_bytes())
@@ -51,15 +51,15 @@ impl Repo {
     }
 
     pub fn load() -> Self {
-        trace!("Reading gmrepo.json.");
-        let path = PathBuf::from("gmrepo.json");
+        trace!("Reading .gmrepo.json.");
+        let path = PathBuf::from(".gmrepo.json");
         if !path.exists() {
             missing_repo_json()
         }
         let s = fs::read_to_string(path)
             .map_err(|e| sync_failed(e.into()))
             .unwrap();
-        trace!("Deserializing gmrepo.json.");
+        trace!("Deserializing .gmrepo.json.");
         serde_json::from_str(&s)
             .map_err(|e| sync_failed(e.into()))
             .unwrap()

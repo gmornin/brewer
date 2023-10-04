@@ -6,7 +6,7 @@ use serde_inline_default::serde_inline_default;
 #[serde_inline_default]
 #[derive(DefaultFromSerde, Serialize, Deserialize, Clone, Config, Debug)]
 pub struct MainConfig {
-    #[serde_inline_default(3)]
+    #[serde_inline_default(1)]
     #[serde(rename = "download-retries")]
     pub download_retries: u16,
 }
