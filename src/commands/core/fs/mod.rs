@@ -14,5 +14,3 @@ mod mkdir;
 pub use mkdir::*;
 mod vis;
 pub use vis::*;
-mod clone;
-pub use clone::*;

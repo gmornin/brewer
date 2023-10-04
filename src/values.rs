@@ -41,6 +41,11 @@ pub mod exit_codes {
         process::exit(4000)
     }
 
+    pub fn missing_repo_json() {
+        error!("4001 Cannot find gmrepo.json, is this a cloned repo?");
+        process::exit(4001)
+    }
+
     // 500s: error/aborted
     //
     /// When "do as I say" failed.
@@ -98,6 +103,12 @@ pub mod exit_codes {
             path.to_string_lossy()
         );
         process::exit(5007)
+    }
+
+    /// there is a conflict between remote and local
+    pub fn repo_conflict() {
+        error!("5008 Aborted action as there is a conflict between local and remote.");
+        process::exit(5008)
     }
 }
 

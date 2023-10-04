@@ -22,6 +22,8 @@ pub fn ignore_tree(path: &Path) -> V1DirTreeNode {
         "Started fs tree tracing in `{}`",
         path.to_string_lossy().to_string()
     );
+    let mut builder = GitignoreBuilder::new(path);
+    builder.add_line(None, "gmrepo.json").unwrap();
     V1DirTreeNode {
         name: path
             .file_name()
@@ -30,9 +32,13 @@ pub fn ignore_tree(path: &Path) -> V1DirTreeNode {
             .to_string(),
         visibility: DEFAULT_VIS,
         content: ignore_tree_recurse(
-            path,
+            &if path == PathBuf::new().as_path() {
+                PathBuf::from(".")
+            } else {
+                path.to_path_buf()
+            },
             PathBuf::from("").as_path(),
-            GitignoreBuilder::new(path),
+            builder,
         ),
     }
 }
@@ -85,11 +91,7 @@ pub fn ignore_tree_recurse(
 
         entries.push(V1DirTreeNode {
             visibility: DEFAULT_VIS,
-            name: display_path
-                // .file_name()
-                // .unwrap()
-                .to_string_lossy()
-                .to_string(),
+            name: entry.file_name().to_string_lossy().to_string(),
             content: if metadata.is_file() {
                 V1DirTreeItem::File {
                     last_modified: metadata

@@ -1,5 +1,6 @@
 use std::{
     error::Error,
+    fmt::Display,
     fs,
     io::{self, Write},
     path::{Path, PathBuf},
@@ -31,6 +32,59 @@ pub struct TreeDiffItem {
     pub path: String,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct DiffConflicts {
+    pub conflicts: Vec<DiffConflictItem>,
+}
+
+impl Display for DiffConflicts {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.conflicts.is_empty() {
+            return f.write_str("");
+        }
+
+        let longest = self
+            .conflicts
+            .iter()
+            .map(|item| item.path.len())
+            .max()
+            .unwrap();
+        f.write_fmt(format_args!(
+            "Conflicts with remote branch.\n   {:<longest$}  Local        Remote\n{}",
+            "Path",
+            self.conflicts
+                .iter()
+                .map(|item| format!(
+                    " - {:<longest$}  {:<9?}       {:<9?}",
+                    item.path, item.fs, item.remote
+                ))
+                .collect::<Vec<_>>()
+                .join("\n")
+        ))
+    }
+}
+
+impl From<Vec<DiffConflictItem>> for DiffConflicts {
+    fn from(value: Vec<DiffConflictItem>) -> Self {
+        Self { conflicts: value }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct DiffConflictItem {
+    pub path: String,
+    pub fs: DiffConflictAction,
+    pub remote: DiffConflictAction,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum DiffConflictAction {
+    Create,
+    CreateDir,
+    Change,
+    Delete,
+}
+
 impl TreeDiffItem {
     fn from(path: PathBuf, size: u64) -> Self {
         Self {
@@ -40,16 +94,139 @@ impl TreeDiffItem {
     }
 }
 
+fn sort(vec: &mut [TreeDiffItem]) {
+    vec.sort_by_key(|item| item.path.to_string());
+}
+
 impl TreeDiff {
+    pub fn is_empty(&self) -> bool {
+        self.created.is_empty()
+            && self.created_dirs.is_empty()
+            && self.changed.is_empty()
+            && self.deleted.is_empty()
+    }
+
     pub fn cmp(old: &V1DirTreeNode, new: &V1DirTreeNode) -> Self {
         let (created, created_dirs, changed) =
             cmp_updated_recurse(old, new, PathBuf::new().as_path());
-        Self {
+        let deleted = cmp_del_recurse(old, new, PathBuf::new().as_path());
+
+        let mut out = Self {
             created,
             created_dirs,
             changed,
-            deleted: cmp_del_recurse(old, new, PathBuf::new().as_path()),
+            deleted,
+        };
+        out.sort();
+        out
+    }
+
+    pub fn sort(&mut self) {
+        sort(&mut self.created);
+        sort(&mut self.created_dirs);
+        sort(&mut self.changed);
+        sort(&mut self.deleted);
+    }
+
+    pub fn conflict(&self, remote: &TreeDiff) -> DiffConflicts {
+        let mut out = Vec::new();
+        for created in self.created.iter() {
+            if let Some(other) = remote.path_modified(&created.path) {
+                out.push(DiffConflictItem {
+                    path: created.path.to_string(),
+                    fs: DiffConflictAction::Create,
+                    remote: other,
+                })
+            }
         }
+        for created_dir in self.created_dirs.iter() {
+            if let Some(other) = remote.path_modified(&created_dir.path) {
+                out.push(DiffConflictItem {
+                    path: created_dir.path.to_string(),
+                    fs: DiffConflictAction::CreateDir,
+                    remote: other,
+                })
+            }
+        }
+        for changed in self.changed.iter() {
+            if let Some(other) = remote.path_modified(&changed.path) {
+                out.push(DiffConflictItem {
+                    path: changed.path.to_string(),
+                    fs: DiffConflictAction::Change,
+                    remote: other,
+                })
+            }
+        }
+        for deleted in self.deleted.iter() {
+            if let Some(other) = remote.folder_modified(&deleted.path) {
+                out.push(DiffConflictItem {
+                    path: deleted.path.to_string(),
+                    fs: DiffConflictAction::Delete,
+                    remote: other,
+                })
+            }
+        }
+
+        DiffConflicts { conflicts: out }
+    }
+
+    pub fn path_modified(&self, path: &str) -> Option<DiffConflictAction> {
+        if self.deleted.iter().any(|deleted| {
+            PathBuf::from(path)
+                .strip_prefix(PathBuf::from(&deleted.path))
+                .is_ok()
+        }) {
+            return Some(DiffConflictAction::Delete);
+        }
+        if self
+            .created
+            .binary_search_by_key(&path, |item| &item.path)
+            .is_ok()
+        {
+            return Some(DiffConflictAction::Create);
+        }
+        if self
+            .created_dirs
+            .binary_search_by_key(&path, |item| &item.path)
+            .is_ok()
+        {
+            return Some(DiffConflictAction::CreateDir);
+        }
+        if self
+            .changed
+            .binary_search_by_key(&path, |item| &item.path)
+            .is_ok()
+        {
+            return Some(DiffConflictAction::Change);
+        }
+
+        None
+    }
+
+    pub fn folder_modified(&self, path: &str) -> Option<DiffConflictAction> {
+        if self.created.iter().any(|created| {
+            PathBuf::from(&created.path)
+                .strip_prefix(PathBuf::from(&path))
+                .is_ok()
+        }) {
+            return Some(DiffConflictAction::Create);
+        }
+        if self.created_dirs.iter().any(|created_dir| {
+            PathBuf::from(&created_dir.path)
+                .strip_prefix(PathBuf::from(&path))
+                .is_ok()
+        }) {
+            return Some(DiffConflictAction::CreateDir);
+        }
+        if self.changed.iter().any(|changed| {
+            PathBuf::from(&changed.path)
+                .strip_prefix(PathBuf::from(&path))
+                .is_ok()
+        }) {
+            return Some(DiffConflictAction::Change);
+        }
+
+        None
     }
 
     pub fn pull(&self, head: &FsHead, instance: &str, owned: bool) -> Result<(), Box<dyn Error>> {
@@ -57,17 +234,17 @@ impl TreeDiff {
         let output = OUTPUT_DIR.get().unwrap();
 
         if !self.deleted.is_empty() {
-            let total = total(&self.deleted);
-            let mut counting = 0;
+            print!("\rDeleting objects...%",);
+            stdout.flush().unwrap();
             for item in self.deleted.iter() {
-                print!(
-                    "\rDeleting objects ({counting}/{total})... {}%",
-                    counting * 100 / total
-                );
-                stdout.flush().unwrap();
-
                 let display_path = item.path.trim_matches('/');
                 let path = output.join(display_path);
+
+                if !path.exists() {
+                    continue;
+                }
+
+                trace!("Deleting directory {display_path}.");
 
                 if fs::metadata(&path)?.is_dir() {
                     trace!("Deleting directory {display_path}.");
@@ -76,10 +253,8 @@ impl TreeDiff {
                     trace!("Deleting file {display_path}.");
                     fs::remove_file(path)?;
                 }
-
-                counting += item.size;
             }
-            println!("\rDeleting objects ({counting}/{total}), done. ");
+            println!("\rDeleting objects, done. ");
         }
 
         if !self.created_dirs.is_empty() {

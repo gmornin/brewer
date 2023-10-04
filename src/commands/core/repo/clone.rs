@@ -33,7 +33,7 @@ pub struct Clone {
 impl CommandTrait for Clone {
     fn run(&self) -> Result<(), Box<dyn Error>> {
         let mut stdout = io::stdout();
-        println!("Resolving objects");
+        print!("Resolving objects");
         stdout.flush().unwrap();
 
         let creds = unsafe { CREDS.get().unwrap() };
