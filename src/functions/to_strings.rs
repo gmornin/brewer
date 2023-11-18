@@ -25,12 +25,7 @@ pub fn diritems_tostring(items: &[V1DirItem]) -> String {
         items.len(),
         items
             .iter()
-            .map(|item| {
-                format!(
-                    "{}",
-                    diritem_tostring(item, longest_size, &PathBuf::from(base_path))
-                )
-            })
+            .map(|item| { diritem_tostring(item, longest_size, &PathBuf::from(base_path)) })
             .collect::<Vec<_>>()
             .join("\n")
     )

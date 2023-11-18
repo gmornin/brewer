@@ -16,3 +16,7 @@ mod to_strings;
 pub use to_strings::*;
 mod ignore_tree;
 pub use ignore_tree::*;
+mod tree_show;
+pub use tree_show::*;
+mod ansi_colours;
+pub use ansi_colours::*;

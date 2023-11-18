@@ -35,7 +35,7 @@ pub struct TreeDiffItem {
     pub path: String,
 }
 
-#[allow(clippy::incorrect_partial_ord_impl_on_ord_type)]
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for TreeDiffItem {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(match self.path.len().partial_cmp(&other.path.len()) {

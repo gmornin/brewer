@@ -27,7 +27,8 @@ config_macro = { path = "macros/config_macro" }
 config_macro_derive = { path = "macros/config_macro_derive" }
 cmdarg_macro_derive = { path = "macros/cmdarg_macro_derive" }
 
-goodmorning-bindings = { git = "https://github.com/gmornin/rust-bindings", rev = "6b5dd7f" }
+goodmorning-bindings = { git = "https://github.com/gmornin/rust-bindings", rev = "04fe654" }
+# goodmorning-bindings = { path = "../rust-bindings" }
 
 [features]
 default = ["debug"]

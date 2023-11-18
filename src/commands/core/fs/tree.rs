@@ -8,33 +8,33 @@ use log::*;
 use crate::{
     exit_codes::{loggedin_only, missing_argument},
     functions::{get, get_url, get_url_instance, v1_handle},
-    BASE_PATH, CREDS,
+    CREDS,
 };
 
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(FromArgs)]
-#[argp(subcommand, name = "ls")]
-/// List directory items.
-pub struct Ls {
+#[argp(subcommand, name = "tree")]
+/// Recursively tree directory items.
+pub struct Tree {
     #[argp(positional)]
-    /// The directory path to list.
+    /// The directory path to tree.
     pub path: String,
     #[argp(option, short = 'u')]
-    /// ID of user's directory to list
+    /// ID of user's directory to tree
     pub id: Option<i64>,
     #[argp(option, short = 'i')]
     /// Instance the user is on
     pub instance: Option<String>,
 }
 
-impl CommandTrait for Ls {
+impl CommandTrait for Tree {
     fn run(&self) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {
             loggedin_only()
         }
 
-        trace!("Logged in, proceeding with listing directory items.");
+        trace!("Logged in, proceeding with treeing directory items.");
 
         let path = self.path.trim_matches('/');
 
@@ -43,7 +43,7 @@ impl CommandTrait for Ls {
         {
             get_url_instance(
                 &format!(
-                    "/api/usercontent/v1/diritems/id/{}/{}",
+                    "/api/usercontent/v1/tree/id/{}/{}",
                     self.id.unwrap_or_else(|| {
                         missing_argument("id");
                         unreachable!()
@@ -53,19 +53,8 @@ impl CommandTrait for Ls {
                 self.instance.as_ref().unwrap(),
             )
         } else {
-            get_url(&format!(
-                "/api/storage/v1/diritems/{}/{}",
-                creds.token, path
-            ))
+            get_url(&format!("/api/storage/v1/tree/{}/{}", creds.token, path))
         };
-
-        BASE_PATH
-            .set(if path.is_empty() {
-                "/".to_string()
-            } else {
-                format!("/{path}/")
-            })
-            .unwrap();
 
         let res: V1Response = get(&url)?;
         v1_handle(&res)?;

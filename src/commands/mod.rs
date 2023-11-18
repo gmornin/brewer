@@ -45,6 +45,7 @@ pub enum TopLevelSubcommands {
     Verify(Verify),
 
     Ls(Ls),
+    Tree(Tree),
     Mv(Mv),
     Cp(Cp),
     Touch(Touch),

@@ -6,11 +6,12 @@ use log::*;
 
 use crate::{functions::diritems_tostring, structs::CredsConfig, CREDS, INSTANCE};
 
-use super::duration_as_string;
+use super::{duration_as_string, tree_show};
 
 pub fn ev1_handle(err: &V1Error) -> Result<(), Box<dyn Error>> {
     debug!("Handling error {err:?}");
     match err {
+        V1Error::Unpeakable => println!("Details of this trigger cannot be previewed."),
         V1Error::UsernameTaken => println!("The username you've chosen has already been taken by another user,\nplease choose another unique username.\nNote that 2 usernames with different casing are considered the same."),
         V1Error::EmailTaken => println!("This email has already been used for another account,\nyou can only register one account for each email address.\nPlease use your own email address, and stop quit making so many account."),
         V1Error::NoSuchUser => println!("Who... is that?\nBut seriously, this user has not been registered on this instance,\nperhaps you made a mistake."),
@@ -34,7 +35,8 @@ pub fn ev1_handle(err: &V1Error) -> Result<(), Box<dyn Error>> {
         V1Error::PathOccupied => println!("The path you want to operate already exists,\nthis action does not allow you to operate on an already occupied location."),
         V1Error::FileNotFound => println!("The file you've requested cannot be found,\ncheck for typos, perhaps it has been deleted."),
         V1Error::FsError { content } => println!("The server's file system returned an error: {content}"),
-        V1Error::FileTooLarge => println!("The file you are trying to upload is too large for the server,\nor you may have exceeded your storage limit."),
+        V1Error::FileTooLarge => println!("The file you are trying to upload is too large for the server."),
+        V1Error::StorageFull => println!("Your storage if full, delete something first."),
         V1Error::NoParent => println!("The specified file path does not have a parent (`../`) component,\nthis is not allowed in the action you are trying to do."),
         V1Error::PermissionDenied => println!("You do not have the permission to perform this action: permission denied"),
         V1Error::TypeMismatch => println!("You tried to run a directory operation on a file, or vice versa.\nMake sure you are doing the right thing to the right object."),
@@ -60,10 +62,10 @@ pub fn ev1_handle(err: &V1Error) -> Result<(), Box<dyn Error>> {
 }
 
 pub fn v1_handle(res: &V1Response) -> Result<(), Box<dyn Error>> {
-    debug!("Handling response {res:?}");
     #[allow(unused_variables)]
     match res {
-        V1Response::Created { id, token } => {
+        V1Response::TriggerPeek { value } => todo!(),
+        V1Response::Created { id, token, verify } => {
             println!("Account has been created,");
             let creds = unsafe { CREDS.get_mut().unwrap() };
             *creds = CredsConfig {
@@ -73,7 +75,8 @@ pub fn v1_handle(res: &V1Response) -> Result<(), Box<dyn Error>> {
             };
             trace!("Writing new account creds to {:?}", CredsConfig::path());
             creds.save()?;
-            println!("you are now logged in");
+            println!("you are now logged in!");
+            println!("an email verification has been sent")
         }
         V1Response::Deleted => {
             println!("Account deleted successfully, all info has been irreversibly deleted.");
@@ -103,10 +106,11 @@ pub fn v1_handle(res: &V1Response) -> Result<(), Box<dyn Error>> {
             println!("Except for this device, the new token has been saved.")
         }
         V1Response::Renamed => println!("Account renamed successfully."),
-        V1Response::EmailChanged => println!("Email changed successfully, please verify your new email address."),
+        V1Response::EmailChanged { verify: true } => println!("Email changed successfully, please verify your new email address."),
+        V1Response::EmailChanged { verify: false } => println!("Email changed successfully."),
         V1Response::PasswordChanged => println!("You password has been changed, successfully."),
         V1Response::VerificationSent => println!("A verification email has been sent to your email address,\nplease click the verify link to verify your account."),
-        V1Response::Tree { content } => todo!(),
+        V1Response::Tree { content } => tree_show(content),
         V1Response::Jobs { current, queue } => todo!(),
         V1Response::Unqueued => println!("Job has been unqueued."),
         V1Response::Triggered => println!("Trigger event has been ran."),
@@ -129,6 +133,7 @@ pub fn v1_handle(res: &V1Response) -> Result<(), Box<dyn Error>> {
         V1Response::TexPublished { id } => todo!(),
         V1Response::TexUserPublish { value } => todo!(),
         V1Response::TexUserPublishes { items } => todo!(),
+        V1Response::TexPublishUpdated => println!("Published item has been updated."),
         V1Response::NothingChanged => println!("Operation returned no errors, but nothing has been changed."),
         V1Response::Error { kind } => return ev1_handle(kind),
         V1Response::Any { value } => println!("The server responded with a custom response:\n{}", serde_json::to_string(value)?)

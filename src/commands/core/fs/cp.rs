@@ -22,7 +22,7 @@ pub struct Cp {
     #[argp(positional)]
     /// Target path of the file item.
     pub to: String,
-    #[argp(option, short = 'i')]
+    #[argp(option, short = 'u')]
     /// User to copy from.
     pub user: Option<i64>,
     #[argp(switch, short = 'o')]
