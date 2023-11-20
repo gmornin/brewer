@@ -19,6 +19,7 @@ html-escape = "0.2"
 serde-inline-default = "0.1"
 serde_default = "0.1"
 dirs = "5.0"
+tokio = { version = "1", features = ["fs"]}
 # ansi_term = "0.12"
 
 command_macro = { path = "macros/command_macro" }

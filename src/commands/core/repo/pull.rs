@@ -81,11 +81,18 @@ impl CommandTrait for Pull {
             path: repo.path.clone(),
             id: repo.user,
         };
-        if let Err(e) = remote_diff.pull(&head, &repo.instance, own) {
-            sync_failed(e);
-        }
-        repo.trees.remote = remote_current;
-        repo.save(&output);
+
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async move {
+                if let Err(e) = remote_diff.pull(&head, &repo.instance, own).await {
+                    sync_failed(e);
+                }
+                repo.trees.remote = remote_current;
+                repo.save(&output);
+            });
 
         println!("All done, you are now up to date.");
         Ok(())

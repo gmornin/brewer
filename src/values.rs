@@ -1,7 +1,16 @@
 use std::{error::Error, path::PathBuf, sync::OnceLock};
 
 use config_macro::ConfigTrait;
-use log::*;
+use log::{debug, trace};
+
+macro_rules! error {
+    ($($tokens:tt)*) => {
+        {
+            log::error!($($tokens)*);
+            log::error!("Command exited unsuccessfully, run with `-v` for verbose debug info.");
+        }
+    };
+}
 
 use crate::structs::{CredsConfig, GmIgnoreDefault, MainConfig};
 
@@ -17,10 +26,14 @@ pub const EXPECT: &str =
     "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
 
 pub mod exit_codes {
-    use std::{error::Error, path::Path, process};
+    use std::{
+        error::Error,
+        fmt::Display,
+        path::{Path, PathBuf},
+        process,
+    };
 
     use goodmorning_bindings::services::v1::V1Response;
-    use log::error;
 
     // 300s: operation not allowed
     //
@@ -131,6 +144,52 @@ pub mod exit_codes {
     pub fn unexpected_response(expect: &str, got: V1Response) {
         error!("5009 Response rematch, expects {expect}, got {got:?}");
         process::exit(5009)
+    }
+
+    pub struct FsAction {
+        r#type: FsActionType,
+        path: PathBuf,
+    }
+
+    impl FsAction {
+        pub fn new(path: PathBuf, action: FsActionType) -> Self {
+            Self {
+                r#type: action,
+                path,
+            }
+        }
+    }
+
+    impl Display for FsAction {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_fmt(format_args!(
+                "{} at {}",
+                self.r#type,
+                self.path.to_string_lossy()
+            ))
+        }
+    }
+
+    pub enum FsActionType {
+        CreateFile,
+        CreateDirectory,
+        WriteFile,
+        DeleteItem,
+    }
+
+    impl Display for FsActionType {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str(match self {
+                Self::CreateFile => "creating file",
+                Self::CreateDirectory => "creating directory",
+                Self::WriteFile => "writing file",
+                Self::DeleteItem => "deleting filesystem item",
+            })
+        }
+    }
+
+    pub fn fs_error(e: &str, action: &FsAction) {
+        error!("5010 File system returned error when {action}: {e}")
     }
 }
 

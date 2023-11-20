@@ -124,6 +124,7 @@ dependencies = [
  "serde-inline-default",
  "serde_default",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]

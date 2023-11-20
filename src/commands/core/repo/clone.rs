@@ -37,7 +37,7 @@ impl CommandTrait for Clone {
         stdout.flush().unwrap();
 
         let creds = unsafe { CREDS.get().unwrap() };
-        let dom = url_domain(&self.url);
+        let dom = url_domain(&self.url).to_string();
         let same_dom = dom == creds.instance;
 
         let (res, code) = get_string(&self.url, true, same_dom)?;
@@ -79,7 +79,7 @@ impl CommandTrait for Clone {
                     head.path.trim_matches('/')
                 )
             },
-            dom,
+            &dom,
         );
         let res: V1Response = get(&url)?;
 
@@ -119,20 +119,27 @@ impl CommandTrait for Clone {
         BASE_PATH.set(head.path.to_string()).unwrap();
         OUTPUT_DIR.set(output.clone()).unwrap();
 
-        if let Err(e) = diff.pull(&head, url.split('/').next().unwrap(), own) {
-            sync_failed(e);
-        }
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async move {
+                if let Err(e) = diff.pull(&head, url.split('/').next().unwrap(), own).await {
+                    println!();
+                    sync_failed(e);
+                }
 
-        if !output.join(".gmignore").exists() {
-            GmIgnoreDefault::create(&output);
-            println!("Created .gmignore file.")
-        }
+                if !output.join(".gmignore").exists() {
+                    GmIgnoreDefault::create(&output);
+                    println!("Created .gmignore file.")
+                }
 
-        trace!("Creating gmrepo.json");
-        let repo = Repo::generate(&output, tree, dom.to_string(), head);
-        repo.save(&output);
+                trace!("Creating gmrepo.json");
+                let repo = Repo::generate(&output, tree, dom.to_string(), head);
+                repo.save(&output);
 
-        println!("All done, you are now up to date.");
+                println!("All done, you are now up to date.");
+            });
         Ok(())
     }
 }

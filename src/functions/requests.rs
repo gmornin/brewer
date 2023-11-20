@@ -3,7 +3,7 @@ use std::{
     error::Error,
     fmt::Display,
     fs::OpenOptions,
-    io::{self, Read, Write},
+    io::{self, Read},
     path::Path,
 };
 
@@ -14,6 +14,7 @@ use reqwest::{
     StatusCode,
 };
 use serde::{de::DeserializeOwned, Serialize};
+use tokio::io::AsyncWriteExt;
 
 use crate::{
     exit_codes::{bad_url, file_not_found, sync_failed},
@@ -298,21 +299,22 @@ pub fn url_domain(url: &str) -> &str {
     .unwrap()
 }
 
-pub fn download_raw(raw_url: &str, path: &Path) -> Result<(), Box<dyn Error>> {
+pub async fn download_raw(raw_url: &str, path: &Path) -> Result<(), Box<dyn Error>> {
     trace!(
         "Downloading file from {raw_url} to {}.",
         path.to_string_lossy()
     );
-    let mut file = OpenOptions::new()
+    let mut file = tokio::fs::OpenOptions::new()
         .write(true)
         .truncate(true)
         .create(true)
-        .open(path)?;
+        .open(path)
+        .await?;
 
     let mut err = None;
     for retry in 0..*DOWNLOAD_RETRIES.get().unwrap() {
         trace!("Downloading, retry {}.", retry + 1);
-        let res = reqwest::blocking::get(raw_url);
+        let res = reqwest::get(raw_url).await;
         let res = match res {
             Ok(res) => res,
             Err(e) => {
@@ -323,14 +325,14 @@ pub fn download_raw(raw_url: &str, path: &Path) -> Result<(), Box<dyn Error>> {
         };
         trace!("Request returned statuse code {}", res.status().to_string());
         trace!("Saving to file.");
-        file.write_all(&res.bytes()?)?;
+        file.write_all(&res.bytes().await?).await?;
         return Ok(());
     }
 
     Err(err.unwrap().into())
 }
 
-pub fn download(url: &str, path: &Path) -> Result<(), Box<dyn Error>> {
+pub async fn download(url: &str, path: &Path) -> Result<(), Box<dyn Error>> {
     let url = format!(
         "{}://{url}",
         if *HTTP.get().unwrap() {
@@ -341,5 +343,6 @@ pub fn download(url: &str, path: &Path) -> Result<(), Box<dyn Error>> {
         }
     );
 
-    download_raw(&url, path)
+    // println!("{} {}", url, path.to_string_lossy());
+    download_raw(&url, path).await
 }
