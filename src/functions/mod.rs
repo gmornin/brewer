@@ -20,3 +20,5 @@ mod tree_show;
 pub use tree_show::*;
 mod ansi_colours;
 pub use ansi_colours::*;
+mod filesize;
+pub use filesize::*;

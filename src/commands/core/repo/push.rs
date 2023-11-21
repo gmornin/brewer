@@ -81,9 +81,15 @@ impl CommandTrait for Push {
             id: repo.user,
         };
 
-        if let Err(e) = fs_diff.push(&head) {
-            sync_failed(e);
-        }
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async move {
+                if let Err(e) = fs_diff.push(&head).await {
+                    sync_failed(e);
+                }
+            });
 
         let res: V1Response = get(&url)?;
         let remote_current = match res {

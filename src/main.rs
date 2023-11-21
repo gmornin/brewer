@@ -17,6 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     trace!("Running command {args:?}");
 
     if args.run().is_err() && !args.verbose {
+        println!();
         error!("Command exited unsuccessfully, run with `-v` for verbose debug info.");
     }
 

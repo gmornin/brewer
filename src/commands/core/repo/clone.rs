@@ -129,14 +129,14 @@ impl CommandTrait for Clone {
                     sync_failed(e);
                 }
 
+                trace!("Creating gmrepo.json");
+                let repo = Repo::generate(&output, tree, dom.to_string(), head);
+                repo.save(&output);
+
                 if !output.join(".gmignore").exists() {
                     GmIgnoreDefault::create(&output);
                     println!("Created .gmignore file.")
                 }
-
-                trace!("Creating gmrepo.json");
-                let repo = Repo::generate(&output, tree, dom.to_string(), head);
-                repo.save(&output);
 
                 println!("All done, you are now up to date.");
             });

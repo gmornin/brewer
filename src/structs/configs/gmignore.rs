@@ -9,7 +9,8 @@ use log::*;
 
 use crate::{exit_codes::create_gmignore_fail, GMIGNORE_DEFAULT};
 
-const DEFAULT: &str = r#".git"#;
+const DEFAULT: &str = r#".git
+.gmrepo.json"#;
 
 pub struct GmIgnoreDefault;
 

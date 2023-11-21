@@ -6,6 +6,7 @@ use log::{debug, trace};
 macro_rules! error {
     ($($tokens:tt)*) => {
         {
+            println!();
             log::error!($($tokens)*);
             log::error!("Command exited unsuccessfully, run with `-v` for verbose debug info.");
         }

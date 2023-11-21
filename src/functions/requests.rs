@@ -9,12 +9,12 @@ use std::{
 
 use log::*;
 use reqwest::{
-    blocking::multipart::{Form, Part},
     header::{self, HeaderValue, COOKIE, USER_AGENT},
+    multipart::{Form, Part},
     StatusCode,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::{
     exit_codes::{bad_url, file_not_found, sync_failed},
@@ -24,6 +24,62 @@ use crate::{
 
 const INSECURE_WARN: &str = "This request is sent using the insecure http protocol";
 const SENDING: &str = "Sending request";
+
+pub async fn post_async<R: DeserializeOwned, T: Serialize + Sized>(
+    url: &str,
+    body: T,
+) -> Result<R, RequestError> {
+    let url = format!(
+        "{}://{url}",
+        if *HTTP.get().unwrap() {
+            debug!("{INSECURE_WARN}");
+            "http"
+        } else {
+            "https"
+        }
+    );
+    debug!("{SENDING} with POST to {url}");
+    debug!("Request body: {}", serde_json::to_string(&body).unwrap());
+    let res = reqwest::Client::new()
+        .post(&url)
+        .header(
+            USER_AGENT,
+            &format!(
+                "{} {} (git {})",
+                env!("CARGO_PKG_NAME"),
+                env!("CARGO_PKG_VERSION"),
+                env!("GIT_HASH")
+            ),
+        )
+        .json(&body)
+        .send()
+        .await;
+    let res = match res {
+        Ok(res) => res,
+        Err(e) => {
+            return Err(RequestError::Send {
+                url: url.to_string(),
+                error: e,
+            });
+        }
+    };
+
+    debug!(
+        "recieved response with status code `{}`",
+        res.status().to_string()
+    );
+    debug!("Response recieved, deserializing");
+    let text = res.text().await.unwrap();
+    trace!("Revieved response:\n{text}");
+    match serde_json::from_str(&text) {
+        Ok(out) => Ok(out),
+        Err(e) => Err(RequestError::Deserialize {
+            url,
+            error: e,
+            content: text,
+        }),
+    }
+}
 
 pub fn post<R: DeserializeOwned, T: Serialize + Sized>(
     url: &str,
@@ -159,7 +215,94 @@ pub fn get<R: DeserializeOwned>(url: &str) -> Result<R, RequestError> {
     }
 }
 
-pub fn upload<R: DeserializeOwned>(url: &str, path: &Path) -> Result<R, RequestError> {
+pub async fn upload_async<R: DeserializeOwned>(url: &str, path: &Path) -> Result<R, RequestError> {
+    if !tokio::fs::try_exists(path).await.unwrap() {
+        error!("No file at {}", path.to_string_lossy());
+        file_not_found(path)
+    }
+
+    let url = format!(
+        "{}://{url}",
+        if *HTTP.get().unwrap() {
+            "http"
+        } else {
+            "https"
+        }
+    );
+
+    trace!("Starting upload for {} to {url}.", path.to_string_lossy());
+
+    trace!("Reading file content.");
+    let mut file = match tokio::fs::OpenOptions::new().read(true).open(path).await {
+        Ok(file) => file,
+        Err(e) => {
+            sync_failed(e.into());
+            unreachable!()
+        }
+    };
+
+    let mut bytes = Vec::new();
+    if let Err(e) = file.read_to_end(&mut bytes).await {
+        sync_failed(e.into());
+        unreachable!()
+    }
+
+    let form = Form::new().part(
+        "file",
+        Part::bytes(bytes)
+            .file_name("filename.txt")
+            .mime_str("application/octet-stream")
+            .unwrap(),
+    );
+
+    trace!("Starting upload");
+
+    let res = reqwest::Client::new()
+        .post(&url)
+        .multipart(form)
+        .header(
+            USER_AGENT,
+            &format!(
+                "{} {} (git {})",
+                env!("CARGO_PKG_NAME"),
+                env!("CARGO_PKG_VERSION"),
+                env!("GIT_HASH")
+            ),
+        )
+        .send()
+        .await
+        .map_err(|e| RequestError::Send {
+            url: url.to_string(),
+            error: e,
+        })?;
+
+    debug!(
+        "Recieved response status code {}.",
+        res.status().to_string()
+    );
+
+    let text = res.text().await.map_err(|e| RequestError::Send {
+        url: url.to_string(),
+        error: e,
+    })?;
+
+    trace!("Deserializing response.");
+
+    match serde_json::from_str(&text) {
+        Ok(out) => Ok(out),
+        Err(e) => {
+            error!("Deserialization failed");
+            info!("Server response: \n{}", text);
+            Err(RequestError::Deserialize {
+                url,
+                error: e,
+                content: text,
+            })
+        }
+    }
+}
+
+pub async fn upload<R: DeserializeOwned>(url: &str, path: &Path) -> Result<R, RequestError> {
     if !path.exists() {
         error!("No file at {}", path.to_string_lossy());
         file_not_found(path)
@@ -190,9 +333,9 @@ pub fn upload<R: DeserializeOwned>(url: &str, path: &Path) -> Result<R, RequestE
         }
     };
 
-    let form = Form::new().part(
+    let form = reqwest::blocking::multipart::Form::new().part(
         "file",
-        Part::bytes(bytes)
+        reqwest::blocking::multipart::Part::bytes(bytes)
             .file_name("filename.txt")
             .mime_str("application/octet-stream")
             .unwrap(),

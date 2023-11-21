@@ -10,7 +10,7 @@ use std::{
 };
 
 use goodmorning_bindings::services::v1::{
-    V1DirTreeItem, V1DirTreeNode, V1Error, V1PathOnly, V1Response,
+    V1DirTreeItem, V1DirTreeNode, V1Error, V1MulpiplePaths, V1Response,
 };
 use log::*;
 
@@ -21,7 +21,7 @@ use crate::{
         bad_clone_json, download_failed, fs_error, sync_failed, unexpected_response, FsAction,
         FsActionType,
     },
-    functions::{download, get_url, post, upload, v1_handle, DEFAULT_VIS},
+    functions::{download, filesize, get_url, post_async, upload_async, v1_handle, DEFAULT_VIS},
     CREDS, OUTPUT_DIR,
 };
 
@@ -265,33 +265,26 @@ impl TreeDiff {
 
         if !self.deleted.is_empty() {
             let counting = Arc::new(AtomicU32::new(0));
-            let total = Arc::new(AtomicU32::new(self.deleted.len() as u32));
+            let total = self.deleted.len() as u32;
+
+            print!("\rDeleting objects (0/{total})... 0%");
+            io::stdout().flush()?;
 
             async fn delete(
                 path: PathBuf,
                 display_path: &str,
                 counting: Arc<AtomicU32>,
-                total: Arc<AtomicU32>,
+                total: u32,
             ) {
                 async fn task(
                     path: &Path,
                     display_path: &str,
                     counting: Arc<AtomicU32>,
-                    total: Arc<AtomicU32>,
+                    total: u32,
                 ) -> Result<(), Box<dyn Error>> {
                     if !tokio::fs::try_exists(&path).await? {
                         trace!("{display_path} does not exist, skipping delete item.");
-                        return Ok(());
-                    }
-
-                    let counting = counting.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                    let total = total.load(std::sync::atomic::Ordering::Relaxed);
-                    print!(
-                        "\rDeleting objects ({counting}/{total})... {}%",
-                        counting * 100 / total
-                    );
-                    io::stdout().flush().unwrap();
-                    if tokio::fs::metadata(&path).await?.is_dir() {
+                    } else if tokio::fs::metadata(&path).await?.is_dir() {
                         trace!("Deleting directory {display_path}.");
                         tokio::fs::remove_dir_all(&path).await?;
                     } else {
@@ -299,10 +292,17 @@ impl TreeDiff {
                         tokio::fs::remove_file(&path).await?;
                     }
 
+                    let counting = counting.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    print!(
+                        "\rDeleting objects ({counting}/{total})... {}%",
+                        counting * 100 / total
+                    );
+                    io::stdout().flush().unwrap();
+
                     Ok(())
                 }
 
-                if let Err(e) = task(&path, display_path, counting.clone(), total.clone()).await {
+                if let Err(e) = task(&path, display_path, counting.clone(), total).await {
                     fs_error(
                         &e.to_string(),
                         &FsAction::new(path, FsActionType::DeleteItem),
@@ -315,53 +315,53 @@ impl TreeDiff {
                 let display_path = item.path.trim_matches('/');
                 let path = output.join(display_path);
 
-                tasks.push(delete(path, display_path, counting.clone(), total.clone()));
+                tasks.push(delete(path, display_path, counting.clone(), total));
             }
 
             for task in tasks {
                 task.await
             }
 
-            let counting = counting.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            let total = total.load(std::sync::atomic::Ordering::Relaxed);
-            println!("\rDeleting objects ({counting}/{total}), done.",);
+            println!("\rDeleting objects ({total}/{total}), done.",);
         }
 
         if !self.created_dirs.is_empty() {
             let counting = Arc::new(AtomicU32::new(0));
-            let total = Arc::new(AtomicU32::new(self.created_dirs.len() as u32));
+            let total = self.created_dirs.len() as u32;
+
+            print!("\rCreating directories (0/{total})... 0%");
+            io::stdout().flush()?;
 
             async fn create_dir(
                 path: PathBuf,
                 display_path: &str,
                 counting: Arc<AtomicU32>,
-                total: Arc<AtomicU32>,
+                total: u32,
             ) {
                 async fn task(
                     path: &Path,
                     display_path: &str,
                     counting: Arc<AtomicU32>,
-                    total: Arc<AtomicU32>,
+                    total: u32,
                 ) -> Result<(), Box<dyn Error>> {
                     if tokio::fs::try_exists(&path).await? {
                         trace!("{display_path} already exist, skipping creating directory.");
                         return Ok(());
                     }
 
+                    trace!("Creating directory {display_path}.");
+                    tokio::fs::create_dir(path).await?;
                     let counting = counting.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                    let total = total.load(std::sync::atomic::Ordering::Relaxed);
                     print!(
                         "\rCreating directories ({counting}/{total})... {}%",
                         counting * 100 / total
                     );
                     io::stdout().flush().unwrap();
-                    trace!("Creating directory {display_path}.");
-                    tokio::fs::create_dir_all(path).await?;
 
                     Ok(())
                 }
 
-                if let Err(e) = task(&path, display_path, counting.clone(), total.clone()).await {
+                if let Err(e) = task(&path, display_path, counting.clone(), total).await {
                     fs_error(
                         &e.to_string(),
                         &FsAction::new(path, FsActionType::DeleteItem),
@@ -369,25 +369,13 @@ impl TreeDiff {
                 }
             }
 
-            let mut tasks = Vec::with_capacity(self.deleted.len());
             for item in self.created_dirs.iter() {
                 let display_path = item.path.trim_matches('/');
                 let path = output.join(display_path);
-                tasks.push(create_dir(
-                    path,
-                    display_path,
-                    counting.clone(),
-                    total.clone(),
-                ));
+                create_dir(path, display_path, counting.clone(), total).await;
             }
 
-            for task in tasks {
-                task.await
-            }
-
-            let counting = counting.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            let total = total.load(std::sync::atomic::Ordering::Relaxed);
-            println!("\rCreating directories ({counting}/{total}), done.",);
+            println!("\rCreating directories ({total}/{total}), done.",);
         }
 
         if !(self.created.is_empty() && self.changed.is_empty()) {
@@ -395,7 +383,12 @@ impl TreeDiff {
             let counting = Arc::new(AtomicU64::new(0));
             let total = total(&self.created) + total(&self.changed);
 
-            print!("\rDownloading objects (0/{total})... 0%");
+            print!(
+                "\rDownloading objects ({}/{})... 0%   ",
+                filesize(0),
+                filesize(total)
+            );
+            io::stdout().flush()?;
 
             async fn download_one(
                 path: PathBuf,
@@ -416,13 +409,14 @@ impl TreeDiff {
                     io::stdout().flush().unwrap();
                     trace!("Downloading item {display_path}.");
                     if download(&url, path).await.is_err() {
-                        println!();
                         download_failed(&display_path);
                     }
                     let counting =
                         counting.fetch_add(size, std::sync::atomic::Ordering::Relaxed) + size;
                     print!(
-                        "\rDownloading objects ({counting}/{total})... {}%",
+                        "\rDownloading objects ({}/{})... {}%   ",
+                        filesize(counting),
+                        filesize(total),
                         counting * 100 / total
                     );
 
@@ -475,43 +469,55 @@ impl TreeDiff {
                 task.await?;
             }
 
-            let counting = counting.load(std::sync::atomic::Ordering::Relaxed);
-            println!("\rDownloading objects ({counting}/{total}), done. ");
+            println!(
+                "\rDownloading objects ({}/{}), done.   ",
+                filesize(counting.load(std::sync::atomic::Ordering::Relaxed)),
+                filesize(total),
+            );
         }
 
         Ok(())
     }
 
-    pub fn push(&self, head: &FsHead) -> Result<(), Box<dyn Error>> {
-        let mut stdout = io::stdout();
+    pub async fn push(&self, head: &FsHead) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get().unwrap() };
 
         if !self.deleted.is_empty() {
-            let total = self.deleted.len();
-            let url = get_url("/api/storage/v1/delete");
-            for (i, item) in self.deleted.iter().enumerate() {
-                trace!("Deleting {}.", item.path);
-                print!("\rDeleting objects ({}/{total})...", i);
-                stdout.flush().unwrap();
+            let url = get_url("/api/storage/v1/delete-multiple");
 
-                let body = V1PathOnly {
-                    token: creds.token.clone(),
-                    path: format!("{}/{}", head.path, item.path.clone()),
-                };
+            print!("\rDeleting objects...");
+            io::stdout().flush()?;
 
-                let res: V1Response = match post(&url, body) {
-                    Ok(res) => res,
-                    Err(e) => {
-                        sync_failed(e.into());
-                        unreachable!()
-                    }
-                };
+            let paths = self
+                .deleted
+                .iter()
+                .map(|item| format!("{}/{}", head.path, item.path))
+                .collect::<Vec<_>>();
 
+            let body = V1MulpiplePaths {
+                token: creds.token.clone(),
+                paths: paths.clone(),
+            };
+
+            let res: V1Response = post_async(&url, body).await?;
+
+            let res = match res {
+                V1Response::Multi { res } => res,
+                res => {
+                    v1_handle(&res).unwrap();
+                    unexpected_response("Multi", res);
+                    unreachable!()
+                }
+            };
+
+            for (path, res) in paths.iter().zip(res.into_iter()) {
                 match res {
-                    V1Response::FileItemDeleted => trace!("Deleted {}", item.path),
+                    V1Response::FileItemDeleted => trace!("Deleted {}", path),
                     V1Response::Error {
                         kind: V1Error::FileNotFound,
-                    } => debug!("Delete {} returns file not found.", item.path),
+                    } => {
+                        debug!("Delete {} returns file not found.", path)
+                    }
                     res => {
                         v1_handle(&res).unwrap();
                         unexpected_response("FileItemDeleted", res)
@@ -519,32 +525,40 @@ impl TreeDiff {
                 }
             }
 
-            println!("\rDeleting objects ({total}/{total}), done.")
+            println!("\rDeleting objects, done.")
         }
 
         if !self.created_dirs.is_empty() {
-            let total = self.created.len();
-            let url = get_url("/api/storage/v1/mkdir");
-            for (i, item) in self.created_dirs.iter().enumerate() {
-                trace!("Creating directory {}.", item.path);
-                print!("\rCreating directories ({}/{total})...", i);
-                stdout.flush().unwrap();
+            let url = get_url("/api/storage/v1/mkdir-multiple");
 
-                let body = V1PathOnly {
-                    token: creds.token.clone(),
-                    path: format!("{}/{}", head.path, item.path.clone()),
-                };
+            print!("\rCreating directories...");
+            io::stdout().flush()?;
 
-                let res: V1Response = match post(&url, body) {
-                    Ok(res) => res,
-                    Err(e) => {
-                        sync_failed(e.into());
-                        unreachable!()
-                    }
-                };
+            let paths = self
+                .created_dirs
+                .iter()
+                .map(|item| format!("{}/{}", head.path, item.path))
+                .collect::<Vec<_>>();
 
+            let body = V1MulpiplePaths {
+                token: creds.token.clone(),
+                paths: paths.clone(),
+            };
+
+            let res: V1Response = post_async(&url, body).await?;
+
+            let res = match res {
+                V1Response::Multi { res } => res,
+                res => {
+                    v1_handle(&res).unwrap();
+                    unexpected_response("Multi", res);
+                    unreachable!()
+                }
+            };
+
+            for (path, res) in paths.iter().zip(res.into_iter()) {
                 match res {
-                    V1Response::FileItemCreated => trace!("Created directory {}", item.path),
+                    V1Response::FileItemCreated => trace!("Created directory {}", path),
                     res => {
                         v1_handle(&res).unwrap();
                         unexpected_response("FileItemCreated", res)
@@ -552,41 +566,91 @@ impl TreeDiff {
                 }
             }
 
-            println!("\rCreating directories ({total}/{total}), done.")
+            println!("\rCreating directories, done.")
         }
 
         if !(self.changed.is_empty() && self.created.is_empty()) {
             let total = total(&self.changed) + total(&self.created);
-            let mut count = 0;
+            let counting = Arc::new(AtomicU64::new(0));
 
+            print!(
+                "\rUploading changes ({}/{})... 0%",
+                filesize(0),
+                filesize(total)
+            );
+            io::stdout().flush()?;
+
+            async fn upload(
+                path: String,
+                url: String,
+                size: u64,
+                counting: Arc<AtomicU64>,
+                total: u64,
+            ) {
+                async fn task(
+                    path: &str,
+                    url: &str,
+                    size: u64,
+                    counting: Arc<AtomicU64>,
+                    total: u64,
+                ) -> Result<(), Box<dyn Error>> {
+                    trace!("Uploading item {}.", path);
+                    let res: V1Response = match upload_async(url, &PathBuf::from(path)).await {
+                        Ok(res) => res,
+                        Err(e) => {
+                            sync_failed(e.into());
+                            unreachable!()
+                        }
+                    };
+
+                    match res {
+                        V1Response::FileItemCreated => trace!("Uploaded file {}", path),
+                        res => {
+                            v1_handle(&res).unwrap();
+                            unexpected_response("FileItemCreated", res)
+                        }
+                    }
+
+                    let counting = counting.fetch_add(size, std::sync::atomic::Ordering::Relaxed);
+                    print!(
+                        "\rUploading changes ({}/{})... {}%   ",
+                        filesize(counting),
+                        filesize(total),
+                        counting * 100 / total
+                    );
+                    io::stdout().flush()?;
+                    Ok(())
+                }
+
+                if let Err(e) = task(&path, &url, size, counting.clone(), total).await {
+                    sync_failed(e);
+                }
+            }
+
+            let mut tasks = Vec::with_capacity(self.changed.len() + self.created.len());
             for item in self.changed.iter().chain(self.created.iter()) {
-                trace!("Uploading item {}.", item.path);
-                print!("\rUploading changes ({}/{total})...", count);
                 let url = get_url(&format!(
                     "/api/storage/v1/upload-overwrite/{}/{}/{}",
                     creds.token, head.path, item.path
                 ));
-
-                let res: V1Response = match upload(&url, &PathBuf::from(&item.path)) {
-                    Ok(res) => res,
-                    Err(e) => {
-                        sync_failed(e.into());
-                        unreachable!()
-                    }
-                };
-
-                match res {
-                    V1Response::FileItemCreated => trace!("Uploaded file {}", item.path),
-                    res => {
-                        v1_handle(&res).unwrap();
-                        unexpected_response("FileItemCreated", res)
-                    }
-                }
-
-                count += item.size;
+                tasks.push(upload(
+                    item.path.clone(),
+                    url,
+                    item.size,
+                    counting.clone(),
+                    total,
+                ));
             }
 
-            println!("\rUploading changes ({total}/{total})...");
+            for task in tasks {
+                task.await
+            }
+
+            println!(
+                "\rUploading changes ({}/{}), done.    ",
+                filesize(counting.load(std::sync::atomic::Ordering::Relaxed)),
+                filesize(total),
+            );
         }
 
         Ok(())
