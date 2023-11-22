@@ -21,8 +21,9 @@ pub struct Status {
     new: String,
 }
 
+#[async_trait::async_trait]
 impl CommandTrait for Status {
-    fn run(&self) -> Result<(), Box<dyn Error>> {
+    async fn run(&self) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {
             loggedin_only()
@@ -34,9 +35,9 @@ impl CommandTrait for Status {
             new: self.new.clone(),
         };
 
-        let url = get_url("/api/accounts/v1/set-status");
+        let url = get_url("/api/accounts/v1/set-status").await;
 
-        let res: V1Response = post(&url, body)?;
+        let res: V1Response = post(&url, body).await?;
         v1_handle(&res)?;
 
         Ok(())

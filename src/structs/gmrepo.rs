@@ -1,12 +1,12 @@
-use std::{
-    fs::{self, OpenOptions},
-    io::Write,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use goodmorning_bindings::services::v1::V1DirTreeNode;
 use log::*;
 use serde::{Deserialize, Serialize};
+use tokio::{
+    fs::{self, OpenOptions},
+    io::AsyncWriteExt,
+};
 
 use crate::{
     exit_codes::{missing_repo_json, sync_failed},
@@ -25,17 +25,22 @@ pub struct Repo {
 }
 
 impl Repo {
-    pub fn generate(path: &Path, remote: V1DirTreeNode, instance: String, head: FsHead) -> Self {
+    pub async fn generate(
+        path: &Path,
+        remote: V1DirTreeNode,
+        instance: String,
+        head: FsHead,
+    ) -> Self {
         Self {
             instance,
             user: head.id,
             path: head.path,
 
-            trees: RepoTree::generate(path, remote),
+            trees: RepoTree::generate(path, remote).await,
         }
     }
 
-    pub fn save(&self, path: &Path) {
+    pub async fn save(&self, path: &Path) {
         let json = serde_json::to_string(self).unwrap();
         trace!("Saving .gmrepo.json.");
         let mut file = OpenOptions::new()
@@ -43,20 +48,23 @@ impl Repo {
             .truncate(true)
             .create(true)
             .open(path.join(".gmrepo.json"))
+            .await
             .map_err(|e| sync_failed(e.into()))
             .unwrap();
         file.write_all(json.as_bytes())
+            .await
             .map_err(|e| sync_failed(e.into()))
             .ok();
     }
 
-    pub fn load() -> Self {
+    pub async fn load() -> Self {
         trace!("Reading .gmrepo.json.");
         let path = PathBuf::from(".gmrepo.json");
         if !path.exists() {
             missing_repo_json()
         }
         let s = fs::read_to_string(path)
+            .await
             .map_err(|e| sync_failed(e.into()))
             .unwrap();
         trace!("Deserializing .gmrepo.json.");
@@ -73,11 +81,11 @@ pub struct RepoTree {
 }
 
 impl RepoTree {
-    pub fn generate(path: &Path, remote: V1DirTreeNode) -> Self {
+    pub async fn generate(path: &Path, remote: V1DirTreeNode) -> Self {
         trace!("Generating fs repo tree.");
         Self {
             remote,
-            fs: ignore_tree(path),
+            fs: ignore_tree(path).await,
         }
     }
 }

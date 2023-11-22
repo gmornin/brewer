@@ -25,8 +25,9 @@ pub struct Vis {
     pub visibility: Visibility,
 }
 
+#[async_trait::async_trait]
 impl CommandTrait for Vis {
-    fn run(&self) -> Result<(), Box<dyn Error>> {
+    async fn run(&self) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {
             loggedin_only()
@@ -42,8 +43,8 @@ impl CommandTrait for Vis {
                 path: path.to_string(),
             };
 
-            let url = get_url("/api/storage/v1/remove-visibility");
-            post(&url, body)?
+            let url = get_url("/api/storage/v1/remove-visibility").await;
+            post(&url, body).await?
         } else {
             let body = V1PathVisibility {
                 token: creds.token.clone(),
@@ -51,8 +52,8 @@ impl CommandTrait for Vis {
                 visibility: self.visibility.into(),
             };
 
-            let url = get_url("/api/storage/v1/set-visibility");
-            post(&url, body)?
+            let url = get_url("/api/storage/v1/set-visibility").await;
+            post(&url, body).await?
         };
 
         v1_handle(&res)?;

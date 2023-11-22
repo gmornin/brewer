@@ -25,13 +25,14 @@ pub struct Cp {
     #[argp(option, short = 'u')]
     /// User to copy from.
     pub user: Option<i64>,
-    #[argp(switch, short = 'o')]
+    #[argp(switch, short = 'f')]
     /// Allow overwriting target file.
-    pub overwrite: bool,
+    pub force: bool,
 }
 
+#[async_trait::async_trait]
 impl CommandTrait for Cp {
-    fn run(&self) -> Result<(), Box<dyn Error>> {
+    async fn run(&self) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {
             loggedin_only()
@@ -48,13 +49,14 @@ impl CommandTrait for Cp {
             from_userid: self.user.unwrap_or(creds.id),
         };
 
-        let url = get_url(if self.overwrite {
+        let url = get_url(if self.force {
             "/api/storage/v1/copy-overwrite"
         } else {
             "/api/storage/v1/copy"
-        });
+        })
+        .await;
 
-        let res: V1Response = post(&url, body)?;
+        let res: V1Response = post(&url, body).await?;
         v1_handle(&res)?;
 
         Ok(())

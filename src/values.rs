@@ -6,7 +6,6 @@ use log::{debug, trace};
 macro_rules! error {
     ($($tokens:tt)*) => {
         {
-            println!();
             log::error!($($tokens)*);
             log::error!("Command exited unsuccessfully, run with `-v` for verbose debug info.");
         }
@@ -22,6 +21,8 @@ pub static mut INSTANCE: OnceLock<String> = OnceLock::new();
 pub static BASE_PATH: OnceLock<String> = OnceLock::new();
 pub static OUTPUT_DIR: OnceLock<PathBuf> = OnceLock::new();
 pub static DOWNLOAD_RETRIES: OnceLock<u16> = OnceLock::new();
+pub static MAX_AGE: OnceLock<u64> = OnceLock::new();
+pub static AUTO_CLEAN: OnceLock<bool> = OnceLock::new();
 pub static GMIGNORE_DEFAULT: OnceLock<String> = OnceLock::new();
 pub const EXPECT: &str =
     "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
@@ -115,8 +116,9 @@ pub mod exit_codes {
     }
 
     /// donwload failed
-    pub fn download_failed(path: &str) {
+    pub fn download_failed(path: &str, e: &str) {
         error!("5005 Downloading failed for {path}, aborting.");
+        error!("Error content:\n{e}");
         process::exit(5005)
     }
 
@@ -199,6 +201,8 @@ pub fn load() -> Result<(), Box<dyn Error>> {
     let main = MainConfig::load()?;
     trace!("Main config loaded and parsed.");
     DOWNLOAD_RETRIES.set(main.download_retries).unwrap();
+    MAX_AGE.set(main.max_age).unwrap();
+    AUTO_CLEAN.set(main.auto_clean).unwrap();
 
     debug!("Loading creds config from {:?}", CredsConfig::path());
     let creds = CredsConfig::load()?;

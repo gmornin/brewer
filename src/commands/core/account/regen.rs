@@ -21,8 +21,9 @@ pub struct Regen {
     pub password: String,
 }
 
+#[async_trait::async_trait]
 impl CommandTrait for Regen {
-    fn run(&self) -> Result<(), Box<dyn Error>> {
+    async fn run(&self) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {
             loggedin_only()
@@ -34,9 +35,9 @@ impl CommandTrait for Regen {
             password: self.password.clone(),
         };
 
-        let url = get_url("/api/accounts/v1/regeneratetoken");
+        let url = get_url("/api/accounts/v1/regeneratetoken").await;
 
-        let res: V1Response = post(&url, body)?;
+        let res: V1Response = post(&url, body).await?;
         v1_handle(&res)?;
 
         Ok(())

@@ -27,8 +27,9 @@ pub struct Exist {
     pub instance: Option<String>,
 }
 
+#[async_trait::async_trait]
 impl CommandTrait for Exist {
-    fn run(&self) -> Result<(), Box<dyn Error>> {
+    async fn run(&self) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {
             loggedin_only()
@@ -52,14 +53,14 @@ impl CommandTrait for Exist {
                 ),
                 self.instance.as_ref().unwrap(),
             );
-            get(&url)
+            get(&url).await
         } else {
-            let url = get_url("/api/storage/v1/exists");
+            let url = get_url("/api/storage/v1/exists").await;
             let body = V1PathOnly {
                 token: creds.token.clone(),
                 path: path.to_string(),
             };
-            post(&url, body)
+            post(&url, body).await
         }?;
 
         v1_handle(&res)?;

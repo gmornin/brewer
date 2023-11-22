@@ -25,9 +25,10 @@ pub struct Push {
     pub force: bool,
 }
 
+#[async_trait::async_trait]
 impl CommandTrait for Push {
-    fn run(&self) -> Result<(), Box<dyn Error>> {
-        let mut repo = Repo::load();
+    async fn run(&self) -> Result<(), Box<dyn Error>> {
+        let mut repo = Repo::load().await;
         let creds = unsafe { CREDS.get().unwrap() };
         if repo.instance != creds.instance || repo.user != creds.id {
             println!("You must be the owner of this repository to push updates to it.");
@@ -41,7 +42,7 @@ impl CommandTrait for Push {
             &format!("/api/storage/v1/tree/{}/{}", creds.token, repo.path),
             &repo.instance,
         );
-        let res: V1Response = get(&url)?;
+        let res: V1Response = get(&url).await?;
         println!("\rResolving objects, done.");
         let remote_current = match res {
             V1Response::Tree { content } => content,
@@ -51,7 +52,7 @@ impl CommandTrait for Push {
                 unreachable!()
             }
         };
-        let fs_current = ignore_tree(&PathBuf::new());
+        let fs_current = ignore_tree(&PathBuf::new()).await;
 
         let remote_diff = TreeDiff::cmp(&repo.trees.remote, &remote_current);
         let fs_diff = TreeDiff::cmp(&repo.trees.fs, &fs_current);
@@ -81,17 +82,11 @@ impl CommandTrait for Push {
             id: repo.user,
         };
 
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-            .block_on(async move {
-                if let Err(e) = fs_diff.push(&head).await {
-                    sync_failed(e);
-                }
-            });
+        if let Err(e) = fs_diff.push(&head).await {
+            sync_failed(e);
+        }
 
-        let res: V1Response = get(&url)?;
+        let res: V1Response = get(&url).await?;
         let remote_current = match res {
             V1Response::Tree { content } => content,
             _ => {
@@ -100,7 +95,7 @@ impl CommandTrait for Push {
         };
         repo.trees.remote = remote_current;
         repo.trees.fs = fs_current;
-        repo.save(&output);
+        repo.save(&output).await;
 
         println!("All done, updates are pushed to remote.");
         Ok(())

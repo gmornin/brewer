@@ -6,7 +6,7 @@ use goodmorning_bindings::services::v1::V1Response;
 use log::*;
 
 use crate::{
-    exit_codes::{loggedin_only, missing_argument},
+    exit_codes::missing_argument,
     functions::{get, get_url, get_url_instance, v1_handle},
     BASE_PATH, CREDS,
 };
@@ -27,18 +27,23 @@ pub struct Ls {
     pub instance: Option<String>,
 }
 
+#[async_trait::async_trait]
 impl CommandTrait for Ls {
-    fn run(&self) -> Result<(), Box<dyn Error>> {
+    async fn run(&self) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {
-            loggedin_only()
+            trace!("Not logged in, proceeding with listing directory items.");
+            if self.instance.is_none() {
+                missing_argument("instance")
+            }
+        } else {
+            trace!("Logged in, proceeding with listing directory items.");
         }
-
-        trace!("Logged in, proceeding with listing directory items.");
 
         let path = self.path.trim_matches('/');
 
-        let url = if self.id.is_some_and(|id| id != creds.id)
+        let url = if !creds.is_loggedin()
+            || self.id.is_some_and(|id| id != creds.id)
             || self.instance.as_ref().is_some_and(|i| i != &creds.instance)
         {
             get_url_instance(
@@ -50,13 +55,14 @@ impl CommandTrait for Ls {
                     }),
                     path
                 ),
-                self.instance.as_ref().unwrap(),
+                self.instance.as_ref().unwrap_or(&creds.instance),
             )
         } else {
             get_url(&format!(
                 "/api/storage/v1/diritems/{}/{}",
                 creds.token, path
             ))
+            .await
         };
 
         BASE_PATH
@@ -67,7 +73,7 @@ impl CommandTrait for Ls {
             })
             .unwrap();
 
-        let res: V1Response = get(&url)?;
+        let res: V1Response = get(&url).await?;
         v1_handle(&res)?;
 
         Ok(())

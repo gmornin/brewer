@@ -4,7 +4,7 @@ use log::*;
 
 use super::prompt;
 
-pub fn get_instance() -> String {
+pub async fn get_instance() -> String {
     match unsafe { INSTANCE.get() } {
         Some(i) if !i.is_empty() => {
             trace!("Instance already contains value, skipping.");
@@ -12,13 +12,13 @@ pub fn get_instance() -> String {
         }
         Some(_) => {
             debug!("Instance contains empty string, prompting for new value.");
-            let i = prompt("Enter instance address");
+            let i = prompt("Enter instance address").await;
             *unsafe { INSTANCE.get_mut().unwrap() } = i.trim().to_string();
             i
         }
         None => {
             debug!("Instance is empty, prompting for new value.");
-            let i = prompt("Enter instance address");
+            let i = prompt("Enter instance address").await;
             *unsafe { INSTANCE.get_mut().unwrap() } = i.trim().to_string();
             i
         }

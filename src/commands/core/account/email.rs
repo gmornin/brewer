@@ -24,14 +24,15 @@ pub struct Email {
     pub password: String,
 }
 
+#[async_trait::async_trait]
 impl CommandTrait for Email {
-    fn run(&self) -> Result<(), Box<dyn Error>> {
+    async fn run(&self) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {
             loggedin_only()
         }
 
-        doasisay("changing email");
+        doasisay("changing email").await;
 
         trace!("Logged in, proceeding with regenerating token.");
         let body = V1ChangeEmail {
@@ -40,9 +41,9 @@ impl CommandTrait for Email {
             new: self.new.clone(),
         };
 
-        let url = get_url("/api/accounts/v1/change-email");
+        let url = get_url("/api/accounts/v1/change-email").await;
 
-        let res: V1Response = post(&url, body)?;
+        let res: V1Response = post(&url, body).await?;
         v1_handle(&res)?;
 
         Ok(())

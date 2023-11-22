@@ -27,8 +27,9 @@ pub struct Login {
     pub password: String,
 }
 
+#[async_trait::async_trait]
 impl CommandTrait for Login {
-    fn run(&self) -> Result<(), Box<dyn Error>> {
+    async fn run(&self) -> Result<(), Box<dyn Error>> {
         if unsafe { CREDS.get().unwrap().is_loggedin() } {
             loggedin_not_allowed()
         }
@@ -49,9 +50,9 @@ impl CommandTrait for Login {
             password: self.password.clone(),
         };
 
-        let url = get_url("/api/accounts/v1/login");
+        let url = get_url("/api/accounts/v1/login").await;
 
-        let res: V1Response = post(&url, body)?;
+        let res: V1Response = post(&url, body).await?;
         v1_handle(&res)?;
 
         Ok(())

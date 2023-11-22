@@ -17,8 +17,9 @@ use crate::{
 /// Resend verification email.
 pub struct Verify {}
 
+#[async_trait::async_trait]
 impl CommandTrait for Verify {
-    fn run(&self) -> Result<(), Box<dyn Error>> {
+    async fn run(&self) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {
             loggedin_only()
@@ -29,9 +30,9 @@ impl CommandTrait for Verify {
             token: creds.token.clone(),
         };
 
-        let url = get_url("/api/accounts/v1/resend-verify");
+        let url = get_url("/api/accounts/v1/resend-verify").await;
 
-        let res: V1Response = post(&url, body)?;
+        let res: V1Response = post(&url, body).await?;
         v1_handle(&res)?;
 
         Ok(())

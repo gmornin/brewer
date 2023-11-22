@@ -1,9 +1,13 @@
 use log::*;
 use std::error::Error;
 
-use brewer::{commands::TopLevel, functions::init_logger};
+use brewer::{
+    commands::{core::Clean, TopLevel, TopLevelSubcommands},
+    functions::init_logger,
+};
 
-fn main() -> Result<(), Box<dyn Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
     let args: TopLevel = argp::parse_args_or_exit(argp::DEFAULT);
     trace!("Argument parse success.");
 
@@ -14,10 +18,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     brewer::load()?;
 
+    if !matches!(args.subcommand, TopLevelSubcommands::Clean(_)) {
+        tokio::task::spawn(async {
+            let _ = Clean::clean_cache().await;
+        });
+    }
+
     trace!("Running command {args:?}");
 
-    if args.run().is_err() && !args.verbose {
-        println!();
+    if args.run().await.is_err() && !args.verbose {
         error!("Command exited unsuccessfully, run with `-v` for verbose debug info.");
     }
 

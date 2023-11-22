@@ -26,7 +26,7 @@ fn impl_command_macro(ast: &syn::DeriveInput) -> TokenStream {
             match &variant.fields {
                 Fields::Unnamed(fields) if fields.unnamed.len() == 1 => {
                     quote! {
-                        Self::#ident(inner) => inner.run(),
+                        Self::#ident(inner) => inner.run().await,
                     }
                 }
                 _ => panic!("{DERIVE_BOUND_E}"),
@@ -35,8 +35,9 @@ fn impl_command_macro(ast: &syn::DeriveInput) -> TokenStream {
         .collect::<Vec<_>>();
 
     let expanded = quote! {
+        #[async_trait::async_trait]
         impl command_macro::CommandTrait for #name {
-            fn run(&self) -> Result<(), Box<dyn Error>> {
+            async fn run(&self) -> Result<(), Box<dyn Error>> {
                 match self {
                     #(#branches)*
                 }

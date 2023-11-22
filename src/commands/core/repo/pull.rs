@@ -25,9 +25,10 @@ pub struct Pull {
     pub force: bool,
 }
 
+#[async_trait::async_trait]
 impl CommandTrait for Pull {
-    fn run(&self) -> Result<(), Box<dyn Error>> {
-        let mut repo = Repo::load();
+    async fn run(&self) -> Result<(), Box<dyn Error>> {
+        let mut repo = Repo::load().await;
         let creds = unsafe { CREDS.get().unwrap() };
         let own = repo.instance == creds.instance && repo.user == creds.id;
 
@@ -42,7 +43,7 @@ impl CommandTrait for Pull {
             },
             &repo.instance,
         );
-        let res: V1Response = get(&url)?;
+        let res: V1Response = get(&url).await?;
         println!("\rResolving objects, done.");
         let remote_current = match res {
             V1Response::Tree { content } => content,
@@ -52,7 +53,7 @@ impl CommandTrait for Pull {
                 unreachable!()
             }
         };
-        let fs_current = ignore_tree(&PathBuf::new());
+        let fs_current = ignore_tree(&PathBuf::new()).await;
 
         let remote_diff = TreeDiff::cmp(&repo.trees.remote, &remote_current);
         if remote_diff.is_empty() {
@@ -82,17 +83,11 @@ impl CommandTrait for Pull {
             id: repo.user,
         };
 
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-            .block_on(async move {
-                if let Err(e) = remote_diff.pull(&head, &repo.instance, own).await {
-                    sync_failed(e);
-                }
-                repo.trees.remote = remote_current;
-                repo.save(&output);
-            });
+        if let Err(e) = remote_diff.pull(&head, &repo.instance, own).await {
+            sync_failed(e);
+        }
+        repo.trees.remote = remote_current;
+        repo.save(&output).await;
 
         println!("All done, you are now up to date.");
         Ok(())

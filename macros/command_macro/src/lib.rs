@@ -1,5 +1,6 @@
 use std::error::Error;
 
+#[async_trait::async_trait]
 pub trait CommandTrait {
-    fn run(&self) -> Result<(), Box<dyn Error>>;
+    async fn run(&self) -> Result<(), Box<dyn Error>>;
 }

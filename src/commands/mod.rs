@@ -32,8 +32,9 @@ pub struct TopLevel {
 #[derive(FromArgs, Command)]
 #[argp(subcommand)]
 pub enum TopLevelSubcommands {
-    Register(Register),
     Version(Version),
+    Clean(Clean),
+    Register(Register),
     Login(Login),
     Logout(Logout),
     Regen(Regen),
@@ -53,6 +54,8 @@ pub enum TopLevelSubcommands {
     Exist(Exist),
     Mkdir(Mkdir),
     Vis(Vis),
+    Upload(Upload),
+    Open(Open),
 
     Clone(Clone),
     Pull(Pull),
@@ -60,11 +63,11 @@ pub enum TopLevelSubcommands {
 }
 
 impl TopLevel {
-    pub fn run(&self) -> Result<(), Box<dyn Error>> {
+    pub async fn run(&self) -> Result<(), Box<dyn Error>> {
         HTTP.set(self.http).unwrap();
         YES.set(self.yes).unwrap();
 
-        self.subcommand.run()?;
+        self.subcommand.run().await?;
 
         Ok(())
     }

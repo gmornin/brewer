@@ -21,7 +21,7 @@ use crate::{
         bad_clone_json, download_failed, fs_error, sync_failed, unexpected_response, FsAction,
         FsActionType,
     },
-    functions::{download, filesize, get_url, post_async, upload_async, v1_handle, DEFAULT_VIS},
+    functions::{self, download, filesize, get_url, post, v1_handle, DEFAULT_VIS},
     CREDS, OUTPUT_DIR,
 };
 
@@ -408,8 +408,8 @@ impl TreeDiff {
                 ) -> Result<(), Box<dyn Error>> {
                     io::stdout().flush().unwrap();
                     trace!("Downloading item {display_path}.");
-                    if download(&url, path).await.is_err() {
-                        download_failed(&display_path);
+                    if let Err(e) = download(&url, path).await {
+                        download_failed(&display_path, &e.to_string());
                     }
                     let counting =
                         counting.fetch_add(size, std::sync::atomic::Ordering::Relaxed) + size;
@@ -483,7 +483,7 @@ impl TreeDiff {
         let creds = unsafe { CREDS.get().unwrap() };
 
         if !self.deleted.is_empty() {
-            let url = get_url("/api/storage/v1/delete-multiple");
+            let url = get_url("/api/storage/v1/delete-multiple").await;
 
             print!("\rDeleting objects...");
             io::stdout().flush()?;
@@ -499,7 +499,7 @@ impl TreeDiff {
                 paths: paths.clone(),
             };
 
-            let res: V1Response = post_async(&url, body).await?;
+            let res: V1Response = post(&url, body).await?;
 
             let res = match res {
                 V1Response::Multi { res } => res,
@@ -529,7 +529,7 @@ impl TreeDiff {
         }
 
         if !self.created_dirs.is_empty() {
-            let url = get_url("/api/storage/v1/mkdir-multiple");
+            let url = get_url("/api/storage/v1/mkdir-multiple").await;
 
             print!("\rCreating directories...");
             io::stdout().flush()?;
@@ -545,7 +545,7 @@ impl TreeDiff {
                 paths: paths.clone(),
             };
 
-            let res: V1Response = post_async(&url, body).await?;
+            let res: V1Response = post(&url, body).await?;
 
             let res = match res {
                 V1Response::Multi { res } => res,
@@ -595,7 +595,7 @@ impl TreeDiff {
                     total: u64,
                 ) -> Result<(), Box<dyn Error>> {
                     trace!("Uploading item {}.", path);
-                    let res: V1Response = match upload_async(url, &PathBuf::from(path)).await {
+                    let res: V1Response = match functions::upload(url, &PathBuf::from(path)).await {
                         Ok(res) => res,
                         Err(e) => {
                             sync_failed(e.into());
@@ -632,7 +632,8 @@ impl TreeDiff {
                 let url = get_url(&format!(
                     "/api/storage/v1/upload-overwrite/{}/{}/{}",
                     creds.token, head.path, item.path
-                ));
+                ))
+                .await;
                 tasks.push(upload(
                     item.path.clone(),
                     url,

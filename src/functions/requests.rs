@@ -1,11 +1,4 @@
-use std::{
-    env,
-    error::Error,
-    fmt::Display,
-    fs::OpenOptions,
-    io::{self, Read},
-    path::Path,
-};
+use std::{env, error::Error, fmt::Display, path::Path};
 
 use log::*;
 use reqwest::{
@@ -14,10 +7,13 @@ use reqwest::{
     StatusCode,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::{
+    fs,
+    io::{AsyncReadExt, AsyncWriteExt},
+};
 
 use crate::{
-    exit_codes::{bad_url, file_not_found, sync_failed},
+    exit_codes::{bad_url, download_failed, file_not_found, sync_failed},
     functions::get_instance,
     CREDS, DOWNLOAD_RETRIES, EXPECT, HTTP,
 };
@@ -25,7 +21,7 @@ use crate::{
 const INSECURE_WARN: &str = "This request is sent using the insecure http protocol";
 const SENDING: &str = "Sending request";
 
-pub async fn post_async<R: DeserializeOwned, T: Serialize + Sized>(
+pub async fn post<R: DeserializeOwned, T: Serialize + Sized>(
     url: &str,
     body: T,
 ) -> Result<R, RequestError> {
@@ -81,62 +77,7 @@ pub async fn post_async<R: DeserializeOwned, T: Serialize + Sized>(
     }
 }
 
-pub fn post<R: DeserializeOwned, T: Serialize + Sized>(
-    url: &str,
-    body: T,
-) -> Result<R, RequestError> {
-    let url = format!(
-        "{}://{url}",
-        if *HTTP.get().unwrap() {
-            debug!("{INSECURE_WARN}");
-            "http"
-        } else {
-            "https"
-        }
-    );
-    debug!("{SENDING} with POST to {url}");
-    debug!("Request body: {}", serde_json::to_string(&body).unwrap());
-    let res = reqwest::blocking::Client::new()
-        .post(&url)
-        .header(
-            USER_AGENT,
-            &format!(
-                "{} {} (git {})",
-                env!("CARGO_PKG_NAME"),
-                env!("CARGO_PKG_VERSION"),
-                env!("GIT_HASH")
-            ),
-        )
-        .json(&body)
-        .send();
-    let res = match res {
-        Ok(res) => res,
-        Err(e) => {
-            return Err(RequestError::Send {
-                url: url.to_string(),
-                error: e,
-            });
-        }
-    };
-
-    debug!(
-        "recieved response with status code `{}`",
-        res.status().to_string()
-    );
-    debug!("Response recieved, deserializing");
-    let text = res.text().unwrap();
-    trace!("Revieved response:\n{text}");
-    match serde_json::from_str(&text) {
-        Ok(out) => Ok(out),
-        Err(e) => Err(RequestError::Deserialize {
-            url,
-            error: e,
-            content: text,
-        }),
-    }
-}
-
-pub fn get_string(
+pub async fn get_string(
     raw_url: &str,
     html: bool,
     token: bool,
@@ -146,7 +87,7 @@ pub fn get_string(
     }
 
     debug!("{SENDING} with GET to {raw_url}");
-    let mut builder = reqwest::blocking::Client::new().get(raw_url).header(
+    let mut builder = reqwest::Client::new().get(raw_url).header(
         USER_AGENT,
         &format!(
             "{} {} (git {})",
@@ -168,7 +109,7 @@ pub fn get_string(
         builder = builder.header(header::ACCEPT, EXPECT);
     }
 
-    let res = builder.send();
+    let res = builder.send().await;
     let res = match res {
         Ok(res) => res,
         Err(e) => {
@@ -186,12 +127,12 @@ pub fn get_string(
     debug!("Response recieved, deserializing");
 
     let status = res.status();
-    let text = res.text().unwrap();
+    let text = res.text().await.unwrap();
     trace!("Revieved response:\n{text}");
     Ok((text, status))
 }
 
-pub fn get<R: DeserializeOwned>(url: &str) -> Result<R, RequestError> {
+pub async fn get<R: DeserializeOwned>(url: &str) -> Result<R, RequestError> {
     let url = format!(
         "{}://{url}",
         if *HTTP.get().unwrap() {
@@ -200,7 +141,7 @@ pub fn get<R: DeserializeOwned>(url: &str) -> Result<R, RequestError> {
             "https"
         }
     );
-    let text = get_string(&url, false, false)?.0;
+    let text = get_string(&url, false, false).await?.0;
     match serde_json::from_str(&text) {
         Ok(out) => Ok(out),
         Err(e) => {
@@ -215,7 +156,7 @@ pub fn get<R: DeserializeOwned>(url: &str) -> Result<R, RequestError> {
     }
 }
 
-pub async fn upload_async<R: DeserializeOwned>(url: &str, path: &Path) -> Result<R, RequestError> {
+pub async fn upload<R: DeserializeOwned>(url: &str, path: &Path) -> Result<R, RequestError> {
     if !tokio::fs::try_exists(path).await.unwrap() {
         error!("No file at {}", path.to_string_lossy());
         file_not_found(path)
@@ -302,91 +243,6 @@ pub async fn upload_async<R: DeserializeOwned>(url: &str, path: &Path) -> Result
     }
 }
 
-pub async fn upload<R: DeserializeOwned>(url: &str, path: &Path) -> Result<R, RequestError> {
-    if !path.exists() {
-        error!("No file at {}", path.to_string_lossy());
-        file_not_found(path)
-    }
-
-    let url = format!(
-        "{}://{url}",
-        if *HTTP.get().unwrap() {
-            "http"
-        } else {
-            "https"
-        }
-    );
-
-    trace!("Starting upload for {} to {url}.", path.to_string_lossy());
-    let bytes = match (|| -> Result<Vec<u8>, io::Error> {
-        trace!("Reading file content.");
-        let mut file = OpenOptions::new().read(true).open(path)?;
-
-        let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer)?;
-        Ok(buffer)
-    })() {
-        Ok(bytes) => bytes,
-        Err(e) => {
-            sync_failed(e.into());
-            unreachable!()
-        }
-    };
-
-    let form = reqwest::blocking::multipart::Form::new().part(
-        "file",
-        reqwest::blocking::multipart::Part::bytes(bytes)
-            .file_name("filename.txt")
-            .mime_str("application/octet-stream")
-            .unwrap(),
-    );
-
-    trace!("Starting upload");
-
-    let res = reqwest::blocking::Client::new()
-        .post(&url)
-        .multipart(form)
-        .header(
-            USER_AGENT,
-            &format!(
-                "{} {} (git {})",
-                env!("CARGO_PKG_NAME"),
-                env!("CARGO_PKG_VERSION"),
-                env!("GIT_HASH")
-            ),
-        )
-        .send()
-        .map_err(|e| RequestError::Send {
-            url: url.to_string(),
-            error: e,
-        })?;
-
-    debug!(
-        "Recieved response status code {}.",
-        res.status().to_string()
-    );
-
-    let text = res.text().map_err(|e| RequestError::Send {
-        url: url.to_string(),
-        error: e,
-    })?;
-
-    trace!("Deserializing response.");
-
-    match serde_json::from_str(&text) {
-        Ok(out) => Ok(out),
-        Err(e) => {
-            error!("Deserialization failed");
-            info!("Server response: \n{}", text);
-            Err(RequestError::Deserialize {
-                url,
-                error: e,
-                content: text,
-            })
-        }
-    }
-}
-
 #[derive(Debug)]
 pub enum RequestError {
     Send {
@@ -419,8 +275,8 @@ impl Display for RequestError {
 
 impl Error for RequestError {}
 
-pub fn get_url(path: &str) -> String {
-    format!("{}{path}", get_instance())
+pub async fn get_url(path: &str) -> String {
+    format!("{}{path}", get_instance().await)
 }
 
 pub fn get_url_instance(path: &str, instance: &str) -> String {
@@ -466,9 +322,18 @@ pub async fn download_raw(raw_url: &str, path: &Path) -> Result<(), Box<dyn Erro
                 continue;
             }
         };
-        trace!("Request returned statuse code {}", res.status().to_string());
+
+        let status = res.status();
+        trace!("Request returned statuse code {}", status.to_string());
+
+        let bytes = res.bytes().await?;
+        if !status.is_success() {
+            fs::remove_file(path).await?;
+            download_failed(&path.to_string_lossy(), &String::from_utf8(bytes.to_vec())?);
+        }
+
         trace!("Saving to file.");
-        file.write_all(&res.bytes().await?).await?;
+        file.write_all(&bytes).await?;
         return Ok(());
     }
 

@@ -21,24 +21,25 @@ pub struct Delete {
     pub password: String,
 }
 
+#[async_trait::async_trait]
 impl CommandTrait for Delete {
-    fn run(&self) -> Result<(), Box<dyn Error>> {
+    async fn run(&self) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {
             loggedin_only()
         }
         trace!("Logged in, proceeding with deletion.");
 
-        doasisay("delete account");
+        doasisay("delete account").await;
 
         let body = V1TokenPassword {
             token: creds.token.clone(),
             password: self.password.clone(),
         };
 
-        let url = get_url("/api/accounts/v1/delete");
+        let url = get_url("/api/accounts/v1/delete").await;
 
-        let res: V1Response = post(&url, body)?;
+        let res: V1Response = post(&url, body).await?;
         v1_handle(&res)?;
 
         Ok(())

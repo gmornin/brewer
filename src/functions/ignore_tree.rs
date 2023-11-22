@@ -9,6 +9,7 @@ use goodmorning_bindings::services::v1::{
 };
 use ignore::gitignore::GitignoreBuilder;
 use log::*;
+use tokio::fs;
 
 use crate::exit_codes::ignore_add_failed;
 
@@ -17,7 +18,7 @@ pub const DEFAULT_VIS: V1Visibility = V1Visibility {
     visibility: ItemVisibility::Private,
 };
 
-pub fn ignore_tree(path: &Path) -> V1DirTreeNode {
+pub async fn ignore_tree(path: &Path) -> V1DirTreeNode {
     trace!(
         "Started fs tree tracing in `{}`",
         path.to_string_lossy().to_string()
@@ -39,11 +40,13 @@ pub fn ignore_tree(path: &Path) -> V1DirTreeNode {
             },
             PathBuf::from("").as_path(),
             builder,
-        ),
+        )
+        .await,
     }
 }
 
-pub fn ignore_tree_recurse(
+#[async_recursion::async_recursion]
+pub async fn ignore_tree_recurse(
     base: &Path,
     current: &Path,
     mut builder: GitignoreBuilder,
@@ -55,16 +58,16 @@ pub fn ignore_tree_recurse(
     let real_path = base.join(current);
 
     let gitignore = real_path.join(".gitignore");
-    if gitignore.exists() {
-        if let Some(e) = builder.add(&gitignore) {
+    if fs::try_exists(&gitignore).await.unwrap() {
+        if let Some(e) = tokio::task::block_in_place(|| builder.add(&gitignore)) {
             debug!("{e}");
             ignore_add_failed(&gitignore)
         }
     }
 
     let gmignore = real_path.join(".gmignore");
-    if gmignore.exists() {
-        if let Some(e) = builder.add(&gmignore) {
+    if fs::try_exists(&gmignore).await.unwrap() {
+        if let Some(e) = tokio::task::block_in_place(|| builder.add(&gmignore)) {
             debug!("{e}");
             ignore_add_failed(&gmignore)
         }
@@ -74,9 +77,10 @@ pub fn ignore_tree_recurse(
 
     let mut entries = Vec::new();
 
-    real_path.read_dir().unwrap().for_each(|entry| {
-        let entry = entry.unwrap();
-        let metadata = entry.metadata().unwrap();
+    let mut diritems = fs::read_dir(real_path).await.unwrap();
+
+    while let Some(entry) = diritems.next_entry().await.unwrap() {
+        let metadata = entry.metadata().await.unwrap();
         let display_path = match entry.path().strip_prefix(base) {
             Ok(p) => p.to_path_buf(),
             Err(_e) => entry.path(),
@@ -86,7 +90,7 @@ pub fn ignore_tree_recurse(
             .matched(&display_path, metadata.is_dir())
             .is_ignore()
         {
-            return;
+            continue;
         }
 
         entries.push(V1DirTreeNode {
@@ -103,10 +107,9 @@ pub fn ignore_tree_recurse(
                     size: metadata.len(),
                 }
             } else {
-                ignore_tree_recurse(base, &display_path, builder.clone())
+                ignore_tree_recurse(base, &display_path, builder.clone()).await
             },
         });
-    });
-
+    }
     V1DirTreeItem::Dir { content: entries }
 }

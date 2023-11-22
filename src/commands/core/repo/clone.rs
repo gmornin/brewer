@@ -1,6 +1,5 @@
 use std::{
     error::Error,
-    fs,
     io::{self, Write},
     path::PathBuf,
 };
@@ -9,6 +8,7 @@ use argp::FromArgs;
 use command_macro::CommandTrait;
 use goodmorning_bindings::services::v1::{V1DirTreeNode, V1Response};
 use log::*;
+use tokio::fs;
 
 use crate::{
     exit_codes::{bad_clone_json, output_path_occupied, sync_failed, unexpected_response},
@@ -30,8 +30,9 @@ pub struct Clone {
     pub output: String,
 }
 
+#[async_trait::async_trait]
 impl CommandTrait for Clone {
-    fn run(&self) -> Result<(), Box<dyn Error>> {
+    async fn run(&self) -> Result<(), Box<dyn Error>> {
         let mut stdout = io::stdout();
         print!("Resolving objects");
         stdout.flush().unwrap();
@@ -40,7 +41,7 @@ impl CommandTrait for Clone {
         let dom = url_domain(&self.url).to_string();
         let same_dom = dom == creds.instance;
 
-        let (res, code) = get_string(&self.url, true, same_dom)?;
+        let (res, code) = get_string(&self.url, true, same_dom).await?;
 
         if !code.is_success() {
             trace!("Status code is not success, aborting.");
@@ -81,7 +82,7 @@ impl CommandTrait for Clone {
             },
             &dom,
         );
-        let res: V1Response = get(&url)?;
+        let res: V1Response = get(&url).await?;
 
         let tree = match res {
             V1Response::Tree { content } => content,
@@ -108,10 +109,10 @@ impl CommandTrait for Clone {
         };
         let output = PathBuf::from(name);
 
-        if output.exists() {
+        if fs::try_exists(&output).await? {
             output_path_occupied(&output);
         } else {
-            fs::create_dir_all(&output)?;
+            fs::create_dir_all(&output).await?;
         }
 
         println!("\rResolving objects, done.");
@@ -119,27 +120,21 @@ impl CommandTrait for Clone {
         BASE_PATH.set(head.path.to_string()).unwrap();
         OUTPUT_DIR.set(output.clone()).unwrap();
 
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-            .block_on(async move {
-                if let Err(e) = diff.pull(&head, url.split('/').next().unwrap(), own).await {
-                    println!();
-                    sync_failed(e);
-                }
+        if let Err(e) = diff.pull(&head, url.split('/').next().unwrap(), own).await {
+            println!();
+            sync_failed(e);
+        }
 
-                trace!("Creating gmrepo.json");
-                let repo = Repo::generate(&output, tree, dom.to_string(), head);
-                repo.save(&output);
+        trace!("Creating gmrepo.json");
+        let repo = Repo::generate(&output, tree, dom.to_string(), head).await;
+        repo.save(&output).await;
 
-                if !output.join(".gmignore").exists() {
-                    GmIgnoreDefault::create(&output);
-                    println!("Created .gmignore file.")
-                }
+        if !fs::try_exists(output.join(".gmignore")).await? {
+            GmIgnoreDefault::create(&output);
+            println!("Created .gmignore file.")
+        }
 
-                println!("All done, you are now up to date.");
-            });
+        println!("All done, you are now up to date.");
         Ok(())
     }
 }

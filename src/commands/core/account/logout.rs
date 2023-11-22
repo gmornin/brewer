@@ -13,8 +13,9 @@ use crate::{exit_codes::loggedin_only, CREDS};
 /// Logout of saved GM account.
 pub struct Logout {}
 
+#[async_trait::async_trait]
 impl CommandTrait for Logout {
-    fn run(&self) -> Result<(), Box<dyn Error>> {
+    async fn run(&self) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {
             loggedin_only()

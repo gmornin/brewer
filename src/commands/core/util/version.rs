@@ -9,8 +9,9 @@ use command_macro::CommandTrait;
 /// Prints CLI version and exits.
 pub struct Version {}
 
+#[async_trait::async_trait]
 impl CommandTrait for Version {
-    fn run(&self) -> Result<(), Box<dyn Error>> {
+    async fn run(&self) -> Result<(), Box<dyn Error>> {
         println!(
             "{} {} (git {})",
             env!("CARGO_PKG_NAME"),

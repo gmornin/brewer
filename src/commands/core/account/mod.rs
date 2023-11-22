@@ -1,7 +1,5 @@
 mod register;
 pub use register::*;
-mod version;
-pub use version::*;
 mod login;
 pub use login::*;
 mod logout;

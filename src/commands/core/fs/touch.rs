@@ -21,8 +21,9 @@ pub struct Touch {
     pub path: String,
 }
 
+#[async_trait::async_trait]
 impl CommandTrait for Touch {
-    fn run(&self) -> Result<(), Box<dyn Error>> {
+    async fn run(&self) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {
             loggedin_only()
@@ -36,9 +37,9 @@ impl CommandTrait for Touch {
             path: path.to_string(),
         };
 
-        let url = get_url("/api/storage/v1/touch");
+        let url = get_url("/api/storage/v1/touch").await;
 
-        let res: V1Response = post(&url, body)?;
+        let res: V1Response = post(&url, body).await?;
         v1_handle(&res)?;
 
         Ok(())

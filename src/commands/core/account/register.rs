@@ -30,8 +30,9 @@ pub struct Register {
     pub password: String,
 }
 
+#[async_trait::async_trait]
 impl CommandTrait for Register {
-    fn run(&self) -> Result<(), Box<dyn Error>> {
+    async fn run(&self) -> Result<(), Box<dyn Error>> {
         if unsafe { CREDS.get().unwrap().is_loggedin() } {
             loggedin_not_allowed()
         }
@@ -44,9 +45,9 @@ impl CommandTrait for Register {
             email: self.email.clone(),
             password: self.password.clone(),
         };
-        let url = get_url("/api/accounts/v1/create");
+        let url = get_url("/api/accounts/v1/create").await;
 
-        let res: V1Response = post(&url, body)?;
+        let res: V1Response = post(&url, body).await?;
         v1_handle(&res)?;
 
         Ok(())

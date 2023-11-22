@@ -21,7 +21,7 @@ pub fn ev1_handle(err: &V1Error) -> Result<(), Box<dyn Error>> {
             trace!("Token invalid, clearning creds.");
             creds.clear();
             trace!("Writing changes to {:?}", CredsConfig::path());
-            creds.save()?;
+            tokio::task::block_in_place(|| creds.save())?;
             println!("The user token you provided is invalid,\nit is likely that someone (hopefully you) has regenerate the token on another device,\nwhich invalidates all existing sessions, including this one.\nPlease run the login command to gain access to your account.")
         },
         V1Error::NotVerified => println!("Your email address has not been verified,\nthis action requires a verified account."),
@@ -134,7 +134,11 @@ pub fn v1_handle(res: &V1Response) -> Result<(), Box<dyn Error>> {
         V1Response::TexUserPublish { value } => todo!(),
         V1Response::TexUserPublishes { items } => todo!(),
         V1Response::TexPublishUpdated => println!("Published item has been updated."),
-        V1Response::Multi { res } => res.iter().for_each(|res| v1_handle(res).expect("error while handing res")),
+        V1Response::Multi { res } => for res in res.clone().into_iter() {
+            tokio::task::spawn_local(async move {
+                v1_handle(&res).expect("error while handling res")
+            });
+        }
         V1Response::NothingChanged => println!("Operation returned no errors, but nothing has been changed."),
         V1Response::Error { kind } => return ev1_handle(kind),
         V1Response::Any { value } => println!("The server responded with a custom response:\n{}", serde_json::to_string(value)?)

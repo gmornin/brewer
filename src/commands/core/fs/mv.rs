@@ -22,13 +22,14 @@ pub struct Mv {
     #[argp(positional)]
     /// Target path of the file item.
     pub to: String,
-    #[argp(switch, short = 'o')]
+    #[argp(switch, short = 'f')]
     /// Allow overwriting target file.
-    pub overwrite: bool,
+    pub force: bool,
 }
 
+#[async_trait::async_trait]
 impl CommandTrait for Mv {
-    fn run(&self) -> Result<(), Box<dyn Error>> {
+    async fn run(&self) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {
             loggedin_only()
@@ -44,13 +45,14 @@ impl CommandTrait for Mv {
             to: to.to_string(),
         };
 
-        let url = get_url(if self.overwrite {
+        let url = get_url(if self.force {
             "/api/storage/v1/move-overwrite"
         } else {
             "/api/storage/v1/move"
-        });
+        })
+        .await;
 
-        let res: V1Response = post(&url, body)?;
+        let res: V1Response = post(&url, body).await?;
         v1_handle(&res)?;
 
         Ok(())
