@@ -37,10 +37,6 @@ impl CommandTrait for Clean {
             return Ok(());
         }
 
-        unsafe {
-            DELETED_SIZE.set(0).unwrap();
-            DELETED_COUNT.set(0).unwrap()
-        };
 
         Self::clean_cache().await?;
 
@@ -56,7 +52,16 @@ impl CommandTrait for Clean {
 
 impl Clean {
     pub async fn clean_cache() -> Result<(), Box<dyn Error>> {
+        unsafe {
+            DELETED_SIZE.set(0).unwrap();
+            DELETED_COUNT.set(0).unwrap()
+        };
+
         let cache = dirs::cache_dir().unwrap().join(env!("CARGO_PKG_NAME"));
+        if !fs::try_exists(&cache).await? {
+            return Ok(());
+        }
+
         Self::clean(&cache).await
     }
 
