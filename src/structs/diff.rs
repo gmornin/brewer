@@ -9,6 +9,7 @@ use std::{
     },
 };
 
+use chrono::Utc;
 use goodmorning_bindings::services::v1::{
     V1DirTreeItem, V1DirTreeNode, V1Error, V1MulpiplePaths, V1Response,
 };
@@ -18,7 +19,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     exit_codes::{
-        bad_clone_json, download_failed, fs_error, sync_failed, unexpected_response, FsAction,
+        bad_head_json, download_failed, fs_error, sync_failed, unexpected_response, FsAction,
         FsActionType,
     },
     functions::{self, download, filesize, get_url, post, v1_handle, DEFAULT_VIS},
@@ -123,7 +124,119 @@ impl TreeDiffItem {
 //     vec.sort_by_key(|item| item.path.to_string());
 // }
 
+fn tree_delete(tree: &mut V1DirTreeNode, path: &[String]) {
+    if path.is_empty() {
+        return;
+    }
+
+    match &mut tree.content {
+        V1DirTreeItem::Dir { content } if path.len() == 1 => {
+            *content = content
+                .clone()
+                .into_iter()
+                .filter(|item| item.name != path[0])
+                .collect()
+        }
+        V1DirTreeItem::Dir { content } => {
+            if let Some(item) = content.iter_mut().find(|item| item.name == path[0]) {
+                tree_delete(item, &path[1..])
+            }
+        }
+        _ => {}
+    }
+}
+
+fn tree_create_dir(tree: &mut V1DirTreeNode, path: &[String]) {
+    if path.is_empty() {
+        return;
+    }
+
+    match &mut tree.content {
+        V1DirTreeItem::Dir { content } if path.len() == 1 => {
+            if !content.iter().any(|item| item.name == path[0]) {
+                content.push(V1DirTreeNode {
+                    visibility: DEFAULT_VIS,
+                    name: path[0].clone(),
+                    content: V1DirTreeItem::Dir {
+                        content: Vec::new(),
+                    },
+                })
+            }
+        }
+        V1DirTreeItem::Dir { content } => {
+            if let Some(item) = content.iter_mut().find(|item| item.name == path[0]) {
+                tree_create_dir(item, &path[1..])
+            }
+        }
+        _ => {}
+    }
+}
+
+fn tree_create(tree: &mut V1DirTreeNode, path: &[String]) {
+    if path.is_empty() {
+        return;
+    }
+
+    match &mut tree.content {
+        // magic number +1 so even if your computer hardware clock is off by 1 second, it still
+        // thinks the file is not changed
+        V1DirTreeItem::Dir { content } if path.len() == 1 => {
+            match content.iter_mut().find(|item| item.name == path[0]) {
+                None => content.push(V1DirTreeNode {
+                    visibility: DEFAULT_VIS,
+                    name: path[0].clone(),
+                    content: V1DirTreeItem::File {
+                        last_modified: Utc::now().timestamp() as u64 + 1,
+                        size: 0,
+                    },
+                }),
+                Some(item) => {
+                    if let V1DirTreeItem::File {
+                        last_modified,
+                        size: _,
+                    } = &mut item.content
+                    {
+                        *last_modified = Utc::now().timestamp() as u64 + 1
+                    }
+                }
+            }
+        }
+        V1DirTreeItem::Dir { content } => {
+            if let Some(item) = content.iter_mut().find(|item| item.name == path[0]) {
+                tree_create(item, &path[1..])
+            }
+        }
+        _ => {}
+    }
+}
+
 impl TreeDiff {
+    pub fn apply(&self, tree: &mut V1DirTreeNode) {
+        self.deleted.iter().for_each(|diff| {
+            let path = PathBuf::from(&diff.path)
+                .iter()
+                .map(|path| path.to_string_lossy().to_string())
+                .collect::<Vec<_>>();
+            tree_delete(tree, &path)
+        });
+        self.created_dirs.iter().for_each(|diff| {
+            let path = PathBuf::from(&diff.path)
+                .iter()
+                .map(|path| path.to_string_lossy().to_string())
+                .collect::<Vec<_>>();
+            tree_create_dir(tree, &path)
+        });
+        self.created
+            .iter()
+            .chain(self.changed.iter())
+            .for_each(|diff| {
+                let path = PathBuf::from(&diff.path)
+                    .iter()
+                    .map(|path| path.to_string_lossy().to_string())
+                    .collect::<Vec<_>>();
+                tree_create(tree, &path)
+            });
+    }
     pub fn is_empty(&self) -> bool {
         self.created.is_empty()
             && self.created_dirs.is_empty()
@@ -417,7 +530,11 @@ impl TreeDiff {
                         "\rDownloading objects ({}/{})... {}%   ",
                         filesize(counting),
                         filesize(total),
-                        counting * 100 / total
+                        if total == 0 {
+                            0
+                        } else {
+                            counting * 100 / total
+                        }
                     );
 
                     Ok(())
@@ -595,13 +712,14 @@ impl TreeDiff {
                     total: u64,
                 ) -> Result<(), Box<dyn Error>> {
                     trace!("Uploading item {}.", path);
-                    let res: V1Response = match functions::upload(url, &PathBuf::from(path)).await {
-                        Ok(res) => res,
-                        Err(e) => {
-                            sync_failed(e.into());
-                            unreachable!()
-                        }
-                    };
+                    let res: V1Response =
+                        match functions::upload(url, &OUTPUT_DIR.get().unwrap().join(path)).await {
+                            Ok(res) => res,
+                            Err(e) => {
+                                sync_failed(e.into());
+                                unreachable!()
+                            }
+                        };
 
                     match res {
                         V1Response::FileItemCreated => trace!("Uploaded file {}", path),
@@ -616,7 +734,11 @@ impl TreeDiff {
                         "\rUploading changes ({}/{})... {}%   ",
                         filesize(counting),
                         filesize(total),
-                        counting * 100 / total
+                        if total == 0 {
+                            0
+                        } else {
+                            counting * 100 / total
+                        }
                     );
                     io::stdout().flush()?;
                     Ok(())
@@ -862,7 +984,7 @@ impl From<&str> for FsHead {
             },
             Err(e) => {
                 debug!("Error deserialising {e}");
-                bad_clone_json();
+                bad_head_json();
                 unreachable!()
             }
         }

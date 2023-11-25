@@ -60,6 +60,7 @@ pub enum TopLevelSubcommands {
     Clone(Clone),
     Pull(Pull),
     Push(Push),
+    Bind(Bind),
 }
 
 impl TopLevel {

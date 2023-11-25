@@ -7,9 +7,13 @@ use std::{
 use argp::FromArgs;
 use command_macro::CommandTrait;
 use goodmorning_bindings::services::v1::V1Response;
+use log::*;
+use tokio::fs;
 
 use crate::{
-    exit_codes::{repo_conflict, sync_failed, unexpected_response},
+    exit_codes::{
+        missing_repo_json, repo_conflict, repo_not_found, sync_failed, unexpected_response,
+    },
     functions::{get, get_url_instance, ignore_tree, v1_handle},
     structs::{FsHead, Repo, TreeDiff},
     BASE_PATH, CREDS, OUTPUT_DIR,
@@ -23,12 +27,29 @@ pub struct Pull {
     #[argp(switch, short = 'f')]
     /// Overwrite conflict files
     pub force: bool,
+    #[argp(option, short = 'o', default = "PathBuf::from(\".\")")]
+    /// Path to local repo
+    pub output: PathBuf,
 }
 
 #[async_trait::async_trait]
 impl CommandTrait for Pull {
     async fn run(&self) -> Result<(), Box<dyn Error>> {
-        let mut repo = Repo::load().await;
+        trace!("Checking if `{}` exists", self.output.to_string_lossy());
+        if !fs::try_exists(&self.output).await? {
+            repo_not_found(&self.output);
+        }
+
+        trace!("Start tracing parents for gmrepo.json");
+        let output = match Repo::find(&self.output).await? {
+            Some(path) => path,
+            None => {
+                missing_repo_json();
+                unreachable!()
+            }
+        };
+
+        let mut repo = Repo::load(&output).await;
         let creds = unsafe { CREDS.get().unwrap() };
         let own = repo.instance == creds.instance && repo.user == creds.id;
 
@@ -53,7 +74,7 @@ impl CommandTrait for Pull {
                 unreachable!()
             }
         };
-        let fs_current = ignore_tree(&PathBuf::new()).await;
+        let fs_current = ignore_tree(&output).await;
 
         let remote_diff = TreeDiff::cmp(&repo.trees.remote, &remote_current);
         if remote_diff.is_empty() {
@@ -73,7 +94,6 @@ impl CommandTrait for Pull {
             }
         }
 
-        let output = PathBuf::new();
         println!("Pulling updates...");
         BASE_PATH.set(repo.path.to_string()).unwrap();
         OUTPUT_DIR.set(output.clone()).unwrap();
@@ -87,6 +107,7 @@ impl CommandTrait for Pull {
             sync_failed(e);
         }
         repo.trees.remote = remote_current;
+        remote_diff.apply(&mut repo.trees.fs);
         repo.save(&output).await;
 
         println!("All done, you are now up to date.");

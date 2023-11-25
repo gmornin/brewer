@@ -11,7 +11,7 @@ use log::*;
 use tokio::fs;
 
 use crate::{
-    exit_codes::{bad_clone_json, output_path_occupied, sync_failed, unexpected_response},
+    exit_codes::{bad_head_json, output_path_occupied, sync_failed, unexpected_response},
     functions::{get, get_string, get_url_instance, url_domain, v1_handle, DEFAULT_VIS},
     structs::{FsHead, GmIgnoreDefault, Repo, TreeDiff},
     BASE_PATH, CREDS, OUTPUT_DIR,
@@ -45,21 +45,21 @@ impl CommandTrait for Clone {
 
         if !code.is_success() {
             trace!("Status code is not success, aborting.");
-            bad_clone_json()
+            bad_head_json()
         }
 
         let line = match res.lines().next() {
             Some(l) => l.trim(),
             None => {
                 trace!("Response empty, first line not possible.");
-                bad_clone_json();
+                bad_head_json();
                 unreachable!()
             }
         };
 
         if !(line.starts_with("<!--") && line.ends_with("-->")) {
             trace!("Expected first line is comment, but it is not.");
-            bad_clone_json()
+            bad_head_json()
         }
 
         let line = line[4..line.len() - 3].to_string();

@@ -77,6 +77,12 @@ pub mod exit_codes {
         process::exit(4002)
     }
 
+    /// directory not found
+    pub fn repo_not_found(path: &Path) {
+        error!("4003 Repo not found at {}", path.to_string_lossy());
+        process::exit(4003)
+    }
+
     // 500s: error/aborted
     //
     /// When "do as I say" failed.
@@ -95,7 +101,7 @@ pub mod exit_codes {
     }
 
     /// clone url bad first lined json
-    pub fn bad_clone_json() {
+    pub fn bad_head_json() {
         error!("5002 Aborted: invalid page first lined JSON in url.");
         process::exit(5002)
     }

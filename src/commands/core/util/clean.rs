@@ -37,7 +37,6 @@ impl CommandTrait for Clean {
             return Ok(());
         }
 
-
         Self::clean_cache().await?;
 
         println!(
