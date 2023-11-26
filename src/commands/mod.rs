@@ -45,6 +45,8 @@ pub enum TopLevelSubcommands {
     Email(Email),
     Verify(Verify),
 
+    Jobs(Jobs),
+
     Ls(Ls),
     Tree(Tree),
     Mv(Mv),

@@ -8,7 +8,7 @@ use log::trace;
 use crate::{
     exit_codes::missing_argument,
     functions::{get, get_url, get_url_instance, v1_handle},
-    CREDS,
+    BASE_PATH, CREDS, FULLPATH,
 };
 
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -25,11 +25,16 @@ pub struct Tree {
     #[argp(option, short = 'i')]
     /// Instance the user is on
     pub instance: Option<String>,
+    #[argp(switch, short = 'f')]
+    /// Display full item path
+    pub full: bool,
 }
 
 #[async_trait::async_trait]
 impl CommandTrait for Tree {
     async fn run(&self) -> Result<(), Box<dyn Error>> {
+        unsafe { *FULLPATH.get_mut().unwrap() = self.full };
+
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {
             trace!("Not logged in, proceeding with treeing directory items.");
@@ -60,6 +65,12 @@ impl CommandTrait for Tree {
         } else {
             get_url(&format!("/api/storage/v1/tree/{}/{}", creds.token, path)).await
         };
+
+        if self.full {
+            BASE_PATH.set(self.path.clone()).unwrap();
+        } else {
+            BASE_PATH.set(String::new()).unwrap();
+        }
 
         let res: V1Response = get(&url).await?;
         v1_handle(&res)?;

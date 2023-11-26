@@ -4,7 +4,11 @@ use config_macro::ConfigTrait;
 use goodmorning_bindings::services::v1::{V1Error, V1Response};
 use log::*;
 
-use crate::{functions::diritems_tostring, structs::CredsConfig, CREDS, INSTANCE};
+use crate::{
+    functions::{diritems_tostring, jobs_to_string},
+    structs::CredsConfig,
+    CREDS, INSTANCE,
+};
 
 use super::{duration_as_string, tree_show};
 
@@ -111,7 +115,10 @@ pub fn v1_handle(res: &V1Response) -> Result<(), Box<dyn Error>> {
         V1Response::PasswordChanged => println!("You password has been changed, successfully."),
         V1Response::VerificationSent => println!("A verification email has been sent to your email address,\nplease click the verify link to verify your account."),
         V1Response::Tree { content } => tree_show(content),
-        V1Response::Jobs { current, queue } => todo!(),
+        V1Response::Jobs { current, queue } => {
+            println!("{}", jobs_to_string("current", current.clone()));
+            println!("{}", jobs_to_string("queue", queue.clone()));
+        },
         V1Response::Unqueued => println!("Job has been unqueued."),
         V1Response::Triggered => println!("Trigger event has been ran."),
         V1Response::Revoked => println!("Trigger revoked."),

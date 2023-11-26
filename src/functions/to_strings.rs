@@ -1,9 +1,14 @@
-use std::path::{Path, PathBuf};
+use std::any::Any;
+use std::path::PathBuf;
 
 use chrono::{Datelike, Local, TimeZone, Timelike};
-use goodmorning_bindings::services::v1::{ItemVisibility, V1DirItem};
+use goodmorning_bindings::services::v1::{ItemVisibility, V1DirItem, V1Job};
+use goodmorning_bindings::structs::TexCompileDisplay;
+use goodmorning_bindings::traits::SerdeAny;
 
+use crate::functions::*;
 use crate::BASE_PATH;
+use crate::FULLPATH;
 
 pub fn diritems_tostring(items: &[V1DirItem]) -> String {
     let longest_size = if items.is_empty() {
@@ -20,22 +25,36 @@ pub fn diritems_tostring(items: &[V1DirItem]) -> String {
     };
 
     let base_path = BASE_PATH.get().unwrap();
+    let title = format!("{BLUE}{} items in {RESET_COLOUR}{base_path}", items.len());
+    let items = items
+        .iter()
+        .map(|item| {
+            diritem_tostring(
+                item,
+                longest_size,
+                if unsafe { *FULLPATH.get().unwrap() } {
+                    PathBuf::from(base_path)
+                } else {
+                    PathBuf::new()
+                },
+            )
+        })
+        .collect::<Vec<_>>();
     format!(
-        "{} items in {base_path}\n---\n{}",
-        items.len(),
-        items
-            .iter()
-            .map(|item| { diritem_tostring(item, longest_size, &PathBuf::from(base_path)) })
-            .collect::<Vec<_>>()
-            .join("\n")
+        "{title}\n{GREY}{}{RESET_COLOUR}\n{}",
+        "─".repeat(items.first().unwrap_or(&title).len()),
+        items.join("\n")
     )
 }
 
-pub fn diritem_tostring(item: &V1DirItem, max_size_len: usize, path: &Path) -> String {
-    let file = format!("{: <4}", if item.is_file { "file" } else { "dir" });
-    let inherited = format!("{: <1}", if item.visibility.inherited { "" } else { "*" });
+pub fn diritem_tostring(item: &V1DirItem, max_size_len: usize, path: PathBuf) -> String {
     let visibility = format!(
-        "{: <8}",
+        "{}{: <8}",
+        if item.visibility.inherited {
+            GREY
+        } else {
+            CYAN
+        },
         match item.visibility.visibility {
             ItemVisibility::Hidden => "hidden",
             ItemVisibility::Public => "public",
@@ -62,9 +81,8 @@ pub fn diritem_tostring(item: &V1DirItem, max_size_len: usize, path: &Path) -> S
         .collect::<String>();
 
     format!(
-        "{file} {visibility}{inherited} {size_pad}{size} {year} {month} {day} {hour}:{min} {}{}",
-        path.join(&item.name).to_str().unwrap(),
-        if item.is_file { "" } else { "/" }
+        "{visibility} {PURPLE}{size_pad}{size} {BLUE}{year} {month} {day} {hour}:{min} {}{RESET_COLOUR}",
+        if item.is_file { format!("{YELLOW}{}", path.join(&item.name).to_string_lossy()) } else {  format!("{BLUE}{}/", path.join(&item.name).to_string_lossy())}
     )
 }
 
@@ -83,5 +101,53 @@ fn month_abbrev(month: u8) -> &'static str {
         11 => "Nov",
         12 => "Dec",
         _ => unreachable!(),
+    }
+}
+
+pub fn jobs_to_string(group: &str, jobs: Vec<V1Job>) -> String {
+    if jobs.is_empty() {
+        return format!("Nothing in {group}");
+    }
+
+    let mut out = format!("{group}:\n");
+    let len = jobs.len() - 1;
+    for (i, job) in jobs.into_iter().enumerate() {
+        if i == len {
+            out += "  └──";
+            let string = job_to_string(job);
+            let mut lines = string.lines();
+
+            out += lines.next().unwrap();
+            out += "\n";
+            lines.for_each(|line| out += &format!("   {line}\n"));
+            continue;
+        }
+
+        out += "  ├──";
+        let string = job_to_string(job);
+        let mut lines = string.lines();
+
+        out += lines.next().unwrap();
+        out += "\n";
+        lines.for_each(|line| out += &format!("  │  {line}\n"));
+        continue;
+    }
+
+    out
+}
+
+fn job_to_string(job: V1Job) -> String {
+    format!("[{}] {}", job.id, task_to_string(job.task))
+}
+
+fn task_to_string(task: Box<dyn SerdeAny>) -> String {
+    let task_any: Box<dyn Any> = task;
+
+    match () {
+        _ if let Some(res) = task_any.downcast_ref::<TexCompileDisplay>() => format!(
+            "Compiling `{}` with compiler `{:?}`.\n      {:?} -> {:?}",
+            res.path, res.compiler, res.from, res.to
+        ),
+        _ => "Task cannot be displayed".to_string(),
     }
 }

@@ -24,6 +24,7 @@ pub static DOWNLOAD_RETRIES: OnceLock<u16> = OnceLock::new();
 pub static MAX_AGE: OnceLock<u64> = OnceLock::new();
 pub static AUTO_CLEAN: OnceLock<bool> = OnceLock::new();
 pub static GMIGNORE_DEFAULT: OnceLock<String> = OnceLock::new();
+pub static mut FULLPATH: OnceLock<bool> = OnceLock::new();
 pub const EXPECT: &str =
     "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
 
@@ -228,6 +229,8 @@ pub fn load() -> Result<(), Box<dyn Error>> {
     GMIGNORE_DEFAULT
         .set(GmIgnoreDefault::load().unwrap())
         .unwrap();
+
+    unsafe { FULLPATH.set(true).unwrap() };
 
     Ok(())
 }

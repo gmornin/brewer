@@ -178,15 +178,13 @@ fn tree_create(tree: &mut V1DirTreeNode, path: &[String]) {
     }
 
     match &mut tree.content {
-        // magic number +1 so even if your computer hardware clock is off by 1 second, it still
-        // thinks the file is not changed
         V1DirTreeItem::Dir { content } if path.len() == 1 => {
             match content.iter_mut().find(|item| item.name == path[0]) {
                 None => content.push(V1DirTreeNode {
                     visibility: DEFAULT_VIS,
                     name: path[0].clone(),
                     content: V1DirTreeItem::File {
-                        last_modified: Utc::now().timestamp() as u64 + 1,
+                        last_modified: Utc::now().timestamp() as u64,
                         size: 0,
                     },
                 }),
@@ -196,7 +194,7 @@ fn tree_create(tree: &mut V1DirTreeNode, path: &[String]) {
                         size: _,
                     } = &mut item.content
                     {
-                        *last_modified = Utc::now().timestamp() as u64 + 1
+                        *last_modified = Utc::now().timestamp() as u64
                     }
                 }
             }

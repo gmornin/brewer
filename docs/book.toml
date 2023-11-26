@@ -1,0 +1,6 @@
+[book]
+authors = ["siriusmart"]
+language = "en_gb"
+multilingual = false
+src = "src"
+title = "Brewer User Manual"
