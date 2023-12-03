@@ -44,6 +44,7 @@ pub enum TopLevelSubcommands {
     Passwd(Passwd),
     Email(Email),
     Verify(Verify),
+    Enable(Enable),
 
     Jobs(Jobs),
 
@@ -64,7 +65,7 @@ pub enum TopLevelSubcommands {
     Push(Push),
     Bind(Bind),
 
-    Compile(Compile)
+    Compile(Compile),
 }
 
 impl TopLevel {

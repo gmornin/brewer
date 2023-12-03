@@ -1,12 +1,12 @@
-use std::{error::Error, path::PathBuf, ffi::OsStr};
+use std::{error::Error, ffi::OsStr, path::PathBuf};
 
 use argp::FromArgs;
 use command_macro::CommandTrait;
-use goodmorning_bindings::services::v1::{V1Response, FromFormat, V1Compile, ToFormat, Compiler};
+use goodmorning_bindings::services::v1::{Compiler, FromFormat, ToFormat, V1Compile, V1Response};
 use log::*;
 
 use crate::{
-    exit_codes::{loggedin_only, missing_argument, unknown_format, unknown_compiler},
+    exit_codes::{loggedin_only, missing_argument, unknown_compiler, unknown_format},
     functions::{get_url, post, v1_handle},
     CREDS,
 };
@@ -41,14 +41,19 @@ impl CommandTrait for Compile {
         trace!("Logged in, proceeding with compiling file.");
 
         let from = match self.from.as_ref() {
-            None => match PathBuf::from(&self.path).extension().unwrap_or(&OsStr::new("")).to_str().unwrap() {
+            None => match PathBuf::from(&self.path)
+                .extension()
+                .unwrap_or(&OsStr::new(""))
+                .to_str()
+                .unwrap()
+            {
                 "md" => FromFormat::Markdown,
                 "tex" => FromFormat::Latex,
                 _ => {
                     missing_argument("from");
                     unreachable!()
                 }
-            }
+            },
             Some(s) => match s.as_str() {
                 "markdown" | "md" => FromFormat::Markdown,
                 "tex" | "lt" | "latex" => FromFormat::Latex,
@@ -56,18 +61,23 @@ impl CommandTrait for Compile {
                     unknown_format(&s);
                     unreachable!()
                 }
-            }
+            },
         };
 
         let to = match self.to.as_ref() {
-            None => match PathBuf::from(&self.path).extension().unwrap_or(&OsStr::new("")).to_str().unwrap() {
+            None => match PathBuf::from(&self.path)
+                .extension()
+                .unwrap_or(&OsStr::new(""))
+                .to_str()
+                .unwrap()
+            {
                 "md" => ToFormat::Html,
                 "tex" => ToFormat::Pdf,
                 _ => {
                     missing_argument("to");
                     unreachable!()
                 }
-            }
+            },
             Some(s) => match s.as_str() {
                 "html" => ToFormat::Html,
                 "pdf" => ToFormat::Pdf,
@@ -75,16 +85,16 @@ impl CommandTrait for Compile {
                     unknown_format(&s);
                     unreachable!()
                 }
-            }
+            },
         };
 
         let compiler = self.compiler.as_ref().map(|s| match s.as_str() {
-           "pulldown cmark" | "cmark" => Compiler::PulldownCmark,
-           "pdflatex" => Compiler::Pdflatex,
-           s => {
-               unknown_compiler(s);
-               unreachable!()
-           }
+            "pulldown cmark" | "cmark" => Compiler::PulldownCmark,
+            "pdflatex" => Compiler::Pdflatex,
+            s => {
+                unknown_compiler(s);
+                unreachable!()
+            }
         });
 
         let path = self.path.trim_matches('/');
@@ -93,9 +103,8 @@ impl CommandTrait for Compile {
             to,
             compiler,
             token: creds.token.clone(),
-            path: path.to_string()
+            path: path.to_string(),
         };
-
 
         println!("Running compile task...");
         let url = get_url("/api/compile/v1/simple").await;

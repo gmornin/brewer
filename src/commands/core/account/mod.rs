@@ -20,3 +20,5 @@ mod verify;
 pub use verify::*;
 mod jobs;
 pub use jobs::*;
+mod enable;
+pub use enable::*;
