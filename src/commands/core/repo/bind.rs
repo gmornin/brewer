@@ -24,7 +24,7 @@ pub struct Bind {
     #[argp(positional)]
     /// Url of remote.
     pub url: String,
-    #[argp(option, short = 'o', default = "PathBuf::new()")]
+    #[argp(option, short = 'o', default = "PathBuf::from(\".\")")]
     /// Path to local directory
     pub output: PathBuf,
 }

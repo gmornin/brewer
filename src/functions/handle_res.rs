@@ -136,7 +136,7 @@ pub fn v1_handle(res: &V1Response) -> Result<(), Box<dyn Error>> {
         V1Response::Profile { profile, account } => todo!(),
         V1Response::ProfileOnly { profile } => todo!(),
         V1Response::PfpReset => println!("Profile details has been reset successfully."),
-        V1Response::TexCompiled { id, newpath } => todo!(),
+        V1Response::TexCompiled { id, newpath } => println!("Compiled task completed [{id}],\nthe compiled file path is `/tex/{newpath}`"),
         V1Response::TexPublished { id } => todo!(),
         V1Response::TexUserPublish { value } => todo!(),
         V1Response::TexUserPublishes { items } => todo!(),

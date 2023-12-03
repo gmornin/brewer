@@ -63,6 +63,8 @@ pub enum TopLevelSubcommands {
     Pull(Pull),
     Push(Push),
     Bind(Bind),
+
+    Compile(Compile)
 }
 
 impl TopLevel {

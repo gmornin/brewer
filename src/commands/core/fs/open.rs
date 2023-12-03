@@ -95,10 +95,12 @@ impl CommandTrait for Open {
                     .as_secs()
                 > *MAX_AGE.get().unwrap()
         {
-            trace!("Fetching file.");
+            println!("Fetching file...");
             download(&url, &output).await?;
+            println!("File fetched to {}", output.to_string_lossy())
         } else {
-            trace!("Not fetching file as it is still fresh.")
+            println!("Not fetching file as it is still fresh.");
+            println!("Cached file located at {}", output.to_string_lossy())
         }
 
         if let Err(e) = open::that_detached(&output) {

@@ -25,7 +25,7 @@ pub struct Clone {
     #[argp(positional)]
     /// Url of remote.
     pub url: String,
-    #[argp(option, short = 'o', default = "String::new()")]
+    #[argp(option, short = 'o', default = "String::from(\".\")")]
     /// Target directory
     pub output: String,
 }

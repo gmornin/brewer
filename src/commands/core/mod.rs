@@ -6,3 +6,5 @@ mod repo;
 pub use repo::*;
 mod util;
 pub use util::*;
+mod tex;
+pub use tex::*;

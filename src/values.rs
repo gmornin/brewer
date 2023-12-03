@@ -138,7 +138,7 @@ pub mod exit_codes {
     /// failed to create .gmignore
     pub fn create_gmignore_fail(e: Box<dyn Error>, path: &Path) {
         error!(
-            "5007 Failed to create .gmignore in path {} with error {e}",
+            "5007 Failed to create .gmignore in path {} with error {e}.",
             path.to_string_lossy()
         );
         process::exit(5007)
@@ -152,8 +152,20 @@ pub mod exit_codes {
 
     /// the recieved response does not match expected
     pub fn unexpected_response(expect: &str, got: V1Response) {
-        error!("5009 Response rematch, expects {expect}, got {got:?}");
+        error!("5009 Response rematch, expects {expect}, got {got:?}.");
         process::exit(5009)
+    }
+
+    /// an invalid compile format is provided
+    pub fn unknown_format(format: &str) {
+        error!("5010 Unknown format, got {format}.");
+        process::exit(5010)
+    }
+
+    /// and invalid compiler is provided
+    pub fn unknown_compiler(compiler: &str) {
+        error!("5011 Unknown compiler, got {compiler}.");
+        process::exit(5011)
     }
 
     pub struct FsAction {
