@@ -43,7 +43,7 @@ impl CommandTrait for Compile {
         let from = match self.from.as_ref() {
             None => match PathBuf::from(&self.path)
                 .extension()
-                .unwrap_or(&OsStr::new(""))
+                .unwrap_or(OsStr::new(""))
                 .to_str()
                 .unwrap()
             {
@@ -58,7 +58,7 @@ impl CommandTrait for Compile {
                 "markdown" | "md" => FromFormat::Markdown,
                 "tex" | "lt" | "latex" => FromFormat::Latex,
                 _ => {
-                    unknown_format(&s);
+                    unknown_format(s);
                     unreachable!()
                 }
             },
@@ -67,7 +67,7 @@ impl CommandTrait for Compile {
         let to = match self.to.as_ref() {
             None => match PathBuf::from(&self.path)
                 .extension()
-                .unwrap_or(&OsStr::new(""))
+                .unwrap_or(OsStr::new(""))
                 .to_str()
                 .unwrap()
             {
@@ -82,7 +82,7 @@ impl CommandTrait for Compile {
                 "html" => ToFormat::Html,
                 "pdf" => ToFormat::Pdf,
                 _ => {
-                    unknown_format(&s);
+                    unknown_format(s);
                     unreachable!()
                 }
             },
