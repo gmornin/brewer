@@ -16,13 +16,13 @@ use crate::{
 #[argp(subcommand, name = "register")]
 /// Register a new GM account.
 pub struct Register {
-    #[argp(positional)]
+    #[argp(option, default = "crate::functions::prompt_sync(\"Username\")", short = 'u')]
     /// Identify yourself.
     pub username: String,
-    #[argp(positional)]
+    #[argp(option, default = "crate::functions::prompt_sync(\"Email\")", short = 'e')]
     /// Email for verification.
     pub email: String,
-    #[argp(positional)]
+    #[argp(option, default = "crate::functions::prompt_sync(\"Instance\")", short = 'i')]
     /// Instance domain or IP.
     pub instance: String,
     #[argp(option, default = "crate::functions::read_pw_confirm()", short = 'p')]

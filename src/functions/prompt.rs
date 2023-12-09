@@ -4,10 +4,15 @@ use std::io::{stdin, stdout, Write};
 use crate::{exit_codes::doas_failed, YES};
 
 pub async fn prompt(msg: &str) -> String {
+    let msg = msg.to_string();
+    tokio::runtime::Runtime::new().unwrap().spawn_blocking(move || prompt_sync(&msg)).await.unwrap()
+}
+
+pub fn prompt_sync(msg: &str) -> String {
     print!("{msg}:\n> ");
     stdout().flush().unwrap();
     let mut s = String::new();
-    tokio::task::block_in_place(|| stdin().read_line(&mut s).expect("could not read input"));
+    stdin().read_line(&mut s).expect("could not read input");
     trace!("Value input recieved.");
     s.trim().to_string()
 }

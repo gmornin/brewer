@@ -1,4 +1,3 @@
-#![feature(trait_upcasting)]
 #![feature(if_let_guard)]
 pub mod commands;
 pub mod functions;

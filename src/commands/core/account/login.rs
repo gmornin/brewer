@@ -16,10 +16,10 @@ use crate::{
 #[argp(subcommand, name = "login")]
 /// Login to an existing GM account.
 pub struct Login {
-    #[argp(positional)]
+    #[argp(option, default = "crate::functions::prompt_sync(\"Identifier\")", short = 'u')]
     /// Username or email address.
     pub identifier: String,
-    #[argp(positional)]
+    #[argp(option, default = "crate::functions::prompt_sync(\"Instance\")", short = 'i')]
     /// Instance domain or IP.
     pub instance: String,
     #[argp(option, default = "crate::functions::read_pw()", short = 'p')]

@@ -2,11 +2,11 @@ use std::any::Any;
 use std::path::PathBuf;
 
 use chrono::{Datelike, Local, TimeZone, Timelike};
-use goodmorning_bindings::services::v1::{ItemVisibility, V1DirItem, V1Job};
+use goodmorning_bindings::services::v1::{ItemVisibility, V1DirItem, V1Job, V1TexUserPublish};
 use goodmorning_bindings::structs::TexCompileDisplay;
 use goodmorning_bindings::traits::SerdeAny;
 
-use crate::functions::*;
+use crate::{functions::*, HTTP};
 use crate::BASE_PATH;
 use crate::FULLPATH;
 
@@ -150,4 +150,29 @@ fn task_to_string(task: Box<dyn SerdeAny>) -> String {
         ),
         _ => "Task cannot be displayed".to_string(),
     }
+}
+
+pub fn publishes_to_string(publishes: &[V1TexUserPublish], instance: &str, userid: i64) -> String {
+    publishes.iter().map(|item| publish_to_string(item, &get_url_instance(&format!("/api/publish/v1/published-file/id/{userid}/{}", item.id), instance))).collect::<Vec<_>>().join(&format!("\n{GREY}──────────────────{RESET_COLOUR}\n"))
+}
+
+pub fn publish_to_string(V1TexUserPublish { id, published, title, desc, ext }: &V1TexUserPublish, url: &str) -> String {
+    let localtime = Local.timestamp_opt(*published as i64, 0).unwrap();
+    let min = format!("{:0>2}", localtime.minute());
+    let hour = format!("{:0>2}", localtime.hour());
+    let day = format!("{: <2}", localtime.day());
+    let month = format!("{: <4}", month_abbrev(localtime.month() as u8));
+    let year = localtime
+        .year()
+        .to_string()
+        .as_bytes()
+        .iter()
+        .rev()
+        .take(2)
+        .rev()
+        .map(|b| *b as char)
+        .collect::<String>();
+
+    let pad = " ".repeat(id.to_string().len() + 3);
+    format!("[{id}] {title}\n{pad}Description: {desc}\n{pad}Published: {year} {month} {day} {hour}:{min}\n{pad}Format: {ext}\n{pad}Url: {}://{url}", if *HTTP.get().unwrap() {"http"} else {"https"})
 }

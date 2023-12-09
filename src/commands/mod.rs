@@ -67,6 +67,7 @@ pub enum TopLevelSubcommands {
 
     Compile(Compile),
     Publish(Publish),
+    Publishes(Publishes)
 }
 
 impl TopLevel {

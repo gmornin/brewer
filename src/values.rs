@@ -18,6 +18,7 @@ pub static HTTP: OnceLock<bool> = OnceLock::new();
 pub static YES: OnceLock<bool> = OnceLock::new();
 pub static mut CREDS: OnceLock<CredsConfig> = OnceLock::new();
 pub static mut INSTANCE: OnceLock<String> = OnceLock::new();
+pub static mut USER_ID: OnceLock<i64> = OnceLock::new();
 pub static BASE_PATH: OnceLock<String> = OnceLock::new();
 pub static OUTPUT_DIR: OnceLock<PathBuf> = OnceLock::new();
 pub static DOWNLOAD_RETRIES: OnceLock<u16> = OnceLock::new();

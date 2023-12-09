@@ -7,10 +7,10 @@ use log::*;
 use crate::{
     functions::{diritems_tostring, jobs_to_string},
     structs::CredsConfig,
-    CREDS, INSTANCE,
+    CREDS, INSTANCE, USER_ID,
 };
 
-use super::{duration_as_string, tree_show};
+use super::{duration_as_string, tree_show, publishes_to_string};
 
 pub fn ev1_handle(err: &V1Error) -> Result<(), Box<dyn Error>> {
     debug!("Handling error {err:?}");
@@ -139,7 +139,7 @@ pub fn v1_handle(res: &V1Response) -> Result<(), Box<dyn Error>> {
         V1Response::TexCompiled { id, newpath } => println!("Compiled task completed [{id}],\nthe compiled file path is `/tex/{newpath}`"),
         V1Response::TexPublished { id } => println!("Item published with ID {id}."),
         V1Response::TexUserPublish { value } => todo!(),
-        V1Response::TexUserPublishes { items } => todo!(),
+        V1Response::TexUserPublishes { items } => println!("{}", publishes_to_string(items.as_slice(), unsafe { INSTANCE.get().unwrap() }, *unsafe { USER_ID.get().unwrap() })),
         V1Response::TexPublishUpdated => println!("Published item has been updated."),
         V1Response::Multi { res } => for res in res.clone().into_iter() {
             tokio::task::spawn_local(async move {
