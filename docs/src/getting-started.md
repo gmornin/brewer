@@ -22,7 +22,7 @@ brewer 0.1.0 (git df72cfc) # or similar
 This section assumes you already have an account. If not, you might want to [create one](https://gmtex.siri.sh).
 
 ```sh
-$ brewer login <username> <instance>
+$ brewer login
 ```
 
 To see more about a command, run with flag -h.
