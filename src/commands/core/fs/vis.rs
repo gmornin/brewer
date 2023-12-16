@@ -15,10 +15,10 @@ use crate::{
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(FromArgs)]
 #[argp(subcommand, name = "vis")]
-/// Create new file.
+/// Change file item visibility.
 pub struct Vis {
     #[argp(positional)]
-    /// The path of new file.
+    /// The path of file item.
     pub path: String,
     #[argp(positional)]
     /// New visibility.
