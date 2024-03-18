@@ -10,7 +10,7 @@ argp = { version = "0.3", default-features = false }
 async-trait = "0.1"
 async-recursion = "1.0"
 rpassword = "7.2"
-reqwest = { version = "0.11", features = ["hyper-tls", "json", "multipart", "native-tls-crate", "tokio-native-tls"], default-features = false }
+reqwest = { version = "0.11", features = ["hyper-tls", "json", "multipart", "native-tls-crate", "tokio-native-tls"], default-features = true }
 serde = { version = "1.0", default-features = false }
 log = "0.4"
 serde_json = { version = "1.0", default-features = false }
