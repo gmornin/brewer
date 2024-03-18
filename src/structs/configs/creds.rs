@@ -12,4 +12,11 @@ impl CredsConfig {
     pub fn is_loggedin(&self) -> bool {
         self.id != 0
     }
+
+    pub fn redact(&self) -> Self {
+        Self {
+            token: "redacted".to_string(),
+            ..self.clone()
+        }
+    }
 }

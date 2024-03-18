@@ -235,7 +235,7 @@ pub fn load() -> Result<(), Box<dyn Error>> {
             );
             INSTANCE.set(creds.instance.clone()).unwrap();
         }
-        trace!("Settind `CREDS` to {creds:?}");
+        trace!("Setting `CREDS` to {:?}", creds.redact());
         CREDS.set(creds).unwrap();
     }
 

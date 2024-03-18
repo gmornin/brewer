@@ -6,23 +6,23 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-argp = "0.3"
+argp = { version = "0.3", default-features = false }
 async-trait = "0.1"
 async-recursion = "1.0"
 rpassword = "7.2"
-reqwest = {version = "0.11", features = ["blocking", "json", "multipart"]}
-serde = { version = "1.0", features = ["derive"]}
+reqwest = { version = "0.11", features = ["hyper-tls", "json", "multipart", "native-tls-crate", "tokio-native-tls"], default-features = false }
+serde = { version = "1.0", default-features = false }
 log = "0.4"
-serde_json = "1.0"
-env_logger = "0.10"
-chrono = "0.4"
+serde_json = { version = "1.0", default-features = false }
+env_logger = { version = "0.10", default-features = false, features = ["auto-color"] }
+chrono = { version = "0.4", default-features = false }
 ignore = "0.4"
-html-escape = "0.2"
+html-escape = { version = "0.2", default-features = false }
 serde-inline-default = "0.1"
 serde_default = "0.1"
 dirs = "5.0"
 open = "5"
-tokio = { version = "1", features = ["fs", "macros"]}
+tokio = { version = "1", features = ["fs", "macros", "rt-multi-thread"] }
 # ansi_term = "0.12"
 
 command_macro = { path = "macros/command_macro" }
@@ -37,3 +37,9 @@ goodmorning-bindings = { git = "https://github.com/gmornin/rust-bindings", rev =
 [features]
 default = ["debug"]
 debug = []
+
+[profile.release]
+strip = true
+lto = true
+opt-level = 3
+panic = "abort"
