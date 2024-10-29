@@ -10,16 +10,16 @@ argp = { version = "0.3", default-features = false }
 async-trait = "0.1"
 async-recursion = "1.0"
 rpassword = "7.2"
-reqwest = { version = "0.11", features = ["hyper-tls", "json", "multipart", "native-tls-crate", "tokio-native-tls"], default-features = true }
+reqwest = { version = "0.12", features = ["json", "multipart"], default-features = true }
 serde = { version = "1.0", default-features = false }
 log = "0.4"
 serde_json = { version = "1.0", default-features = false }
-env_logger = { version = "0.10", default-features = false, features = ["auto-color"] }
+env_logger = { version = "0.11", default-features = false, features = ["auto-color"] }
 chrono = { version = "0.4", default-features = false }
 ignore = "0.4"
 html-escape = { version = "0.2", default-features = false }
-serde-inline-default = "0.1"
-serde_default = "0.1"
+serde-inline-default = "0.2"
+serde_default = "0.2"
 dirs = "5.0"
 open = "5"
 tokio = { version = "1", features = ["fs", "macros", "rt-multi-thread"] }
@@ -31,7 +31,7 @@ config_macro = { path = "macros/config_macro" }
 config_macro_derive = { path = "macros/config_macro_derive" }
 cmdarg_macro_derive = { path = "macros/cmdarg_macro_derive" }
 
-goodmorning-bindings = { git = "https://github.com/gmornin/rust-bindings", rev = "1d0c340" }
+goodmorning-bindings = { git = "https://github.com/gmornin/rust-bindings", rev = "6093beb" }
 # goodmorning-bindings = { path = "../rust-bindings" }
 
 [features]

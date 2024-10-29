@@ -6,9 +6,9 @@ use goodmorning_bindings::services::v1::{ItemVisibility, V1DirItem, V1Job, V1Tex
 use goodmorning_bindings::structs::TexCompileDisplay;
 use goodmorning_bindings::traits::SerdeAny;
 
-use crate::{functions::*, HTTP};
 use crate::BASE_PATH;
 use crate::FULLPATH;
+use crate::{functions::*, HTTP};
 
 pub fn diritems_tostring(items: &[V1DirItem]) -> String {
     let longest_size = if items.is_empty() {
@@ -153,10 +153,31 @@ fn task_to_string(task: Box<dyn SerdeAny>) -> String {
 }
 
 pub fn publishes_to_string(publishes: &[V1TexUserPublish], instance: &str, userid: i64) -> String {
-    publishes.iter().map(|item| publish_to_string(item, &get_url_instance(&format!("/api/publish/v1/published-file/id/{userid}/{}", item.id), instance))).collect::<Vec<_>>().join(&format!("\n{GREY}──────────────────{RESET_COLOUR}\n"))
+    publishes
+        .iter()
+        .map(|item| {
+            publish_to_string(
+                item,
+                &get_url_instance(
+                    &format!("/api/publish/v1/published-file/id/{userid}/{}", item.id),
+                    instance,
+                ),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(&format!("\n{GREY}──────────────────{RESET_COLOUR}\n"))
 }
 
-pub fn publish_to_string(V1TexUserPublish { id, published, title, desc, ext }: &V1TexUserPublish, url: &str) -> String {
+pub fn publish_to_string(
+    V1TexUserPublish {
+        id,
+        published,
+        title,
+        desc,
+        ext,
+    }: &V1TexUserPublish,
+    url: &str,
+) -> String {
     let localtime = Local.timestamp_opt(*published as i64, 0).unwrap();
     let min = format!("{:0>2}", localtime.minute());
     let hour = format!("{:0>2}", localtime.hour());

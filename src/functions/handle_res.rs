@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::fmt::Write;
 
 use config_macro::ConfigTrait;
 use goodmorning_bindings::services::v1::{V1Error, V1Response};
@@ -10,11 +11,12 @@ use crate::{
     CREDS, INSTANCE, USER_ID,
 };
 
-use super::{duration_as_string, tree_show, publishes_to_string};
+use super::{duration_as_string, publishes_to_string, tree_show};
 
 pub fn ev1_handle(err: &V1Error) -> Result<(), Box<dyn Error>> {
     debug!("Handling error {err:?}");
     match err {
+        V1Error::Blacklisted => println!("You have been blacklisted from this action."),
         V1Error::Unpeakable => println!("Details of this trigger cannot be previewed."),
         V1Error::UsernameTaken => println!("The username you've chosen has already been taken by another user,\nplease choose another unique username.\nNote that 2 usernames with different casing are considered the same."),
         V1Error::EmailTaken => println!("This email has already been used for another account,\nyou can only register one account for each email address.\nPlease use your own email address, and stop quit making so many account."),
@@ -139,7 +141,15 @@ pub fn v1_handle(res: &V1Response) -> Result<(), Box<dyn Error>> {
         V1Response::TexCompiled { id, newpath } => println!("Compiled task completed [{id}],\nthe compiled file path is `/tex/{newpath}`"),
         V1Response::TexPublished { id } => println!("Item published with ID {id}."),
         V1Response::TexUserPublish { value } => todo!(),
-        V1Response::TexUserPublishes { items } => println!("{}", publishes_to_string(items.as_slice(), unsafe { INSTANCE.get().unwrap() }, *unsafe { USER_ID.get().unwrap() })),
+        V1Response::Allowed => println!("Access shared with user."),
+        V1Response::Disallowed => println!("Access removed from user."),
+        V1Response::Access { users } if !users.is_empty() => println!("The following users have access:{}", users.iter().fold(String::new(), |mut current, user| {
+            write!(current, "\n- {}", user.username).unwrap();
+            current
+        })),
+        V1Response::Access { .. } => println!("No users have access."),
+        // TODO
+        V1Response::TexUserPublishes { items, .. } => println!("{}", publishes_to_string(items.as_slice(), unsafe { INSTANCE.get().unwrap() }, *unsafe { USER_ID.get().unwrap() })),
         V1Response::TexPublishUpdated => println!("Published item has been updated."),
         V1Response::Multi { res } => for res in res.clone().into_iter() {
             tokio::task::spawn_local(async move {

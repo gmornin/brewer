@@ -8,7 +8,7 @@ use log::*;
 use crate::{
     exit_codes::missing_argument,
     functions::{get, get_url_instance, v1_handle},
-    CREDS, INSTANCE, USER_ID
+    CREDS, INSTANCE, USER_ID,
 };
 
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -44,11 +44,11 @@ impl CommandTrait for Publishes {
         }
 
         let instance = self.instance.as_ref().unwrap_or(&creds.instance);
-        unsafe { *INSTANCE.get_mut().unwrap() = instance.clone()};
+        unsafe { *INSTANCE.get_mut().unwrap() = instance.clone() };
         let id = self.id.unwrap_or(creds.id);
         unsafe { USER_ID.set(id).unwrap() };
 
-        let url = get_url_instance(&format!("/api/publish/v1/publishes/id/{id}"), &instance);
+        let url = get_url_instance(&format!("/api/publish/v1/publishes/id/{id}"), instance);
 
         let res: V1Response = get(&url).await?;
         v1_handle(&res)?;

@@ -45,6 +45,9 @@ pub enum TopLevelSubcommands {
     Email(Email),
     Verify(Verify),
     Enable(Enable),
+    Allow(Allow),
+    Deny(Deny),
+    Access(Access),
 
     Jobs(Jobs),
 
@@ -67,7 +70,7 @@ pub enum TopLevelSubcommands {
 
     Compile(Compile),
     Publish(Publish),
-    Publishes(Publishes)
+    Publishes(Publishes),
 }
 
 impl TopLevel {
