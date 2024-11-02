@@ -8,7 +8,7 @@ use log::trace;
 use crate::{
     exit_codes::missing_argument,
     functions::{get, get_url, get_url_instance, v1_handle},
-    BASE_PATH, CREDS, FULLPATH,
+    BASE_PATH, CREDS, FULLPATH, FULL_PATH,
 };
 
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -67,12 +67,15 @@ impl CommandTrait for Tree {
         };
 
         if self.full {
+            FULL_PATH.set(true).unwrap();
             BASE_PATH.set(self.path.clone()).unwrap();
         } else {
+            FULL_PATH.set(false).unwrap();
             BASE_PATH.set(String::new()).unwrap();
         }
 
         let res: V1Response = get(&url).await?;
+
         v1_handle(&res)?;
 
         Ok(())
