@@ -148,6 +148,11 @@ pub fn v1_handle(res: &V1Response) -> Result<(), Box<dyn Error>> {
             current
         })),
         V1Response::Access { .. } => println!("No users have access."),
+        V1Response::AllowedAccess { users } if !users.is_empty() => println!("This user have access to:{}", users.iter().fold(String::new(), |mut current, user| {
+            write!(current, "\n- {}", user.username).unwrap();
+            current
+        })),
+        V1Response::AllowedAccess { .. } => println!("No other users have shared access to you."),
         // TODO
         V1Response::TexUserPublishes { items, .. } => println!("{}", publishes_to_string(items.as_slice(), unsafe { INSTANCE.get().unwrap() }, *unsafe { USER_ID.get().unwrap() })),
         V1Response::TexPublishUpdated => println!("Published item has been updated."),

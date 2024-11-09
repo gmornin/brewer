@@ -1,13 +1,9 @@
 use std::error::Error;
 
 use argp::FromArgs;
-use cmdarg_macro_derive::CmdArg;
 use command_macro::CommandTrait;
-use goodmorning_bindings::services::v1::{
-    AccessType as BindingAccess, V1Access, V1IdentifierType, V1Response,
-};
+use goodmorning_bindings::services::v1::{V1Access, V1IdentifierType, V1Response};
 use log::*;
-use serde::{Deserialize, Serialize};
 
 use crate::{
     exit_codes::loggedin_only,
@@ -15,19 +11,7 @@ use crate::{
     CREDS,
 };
 
-#[derive(Serialize, Deserialize, Debug, CmdArg, Clone, Copy)]
-enum AccessType {
-    #[serde(rename = "file")]
-    File,
-}
-
-impl From<AccessType> for BindingAccess {
-    fn from(val: AccessType) -> Self {
-        match val {
-            AccessType::File => BindingAccess::File,
-        }
-    }
-}
+use super::AccessType;
 
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(FromArgs)]

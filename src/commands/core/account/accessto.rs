@@ -2,7 +2,7 @@ use std::error::Error;
 
 use argp::FromArgs;
 use command_macro::CommandTrait;
-use goodmorning_bindings::services::v1::{V1Access, V1IdentifierType, V1Response};
+use goodmorning_bindings::services::v1::{V1Response, V1TokenAccessTypeOptionIdentifier};
 use log::*;
 
 use crate::{
@@ -15,33 +15,34 @@ use super::AccessType;
 
 #[cfg_attr(feature = "debug", derive(Debug))]
 #[derive(FromArgs)]
-#[argp(subcommand, name = "deny")]
-/// Remove an access to another acount.
-pub struct Deny {
+#[argp(subcommand, name = "accessto")]
+/// View accounts you have access to.
+pub struct AccessTo {
     #[argp(positional)]
-    /// Access you want to remove.
+    /// Access type to show.
     access: AccessType,
-    #[argp(positional)]
-    user: String,
+    #[argp(option)]
+    /// User you want to view access of
+    user: Option<String>,
 }
 
 #[async_trait::async_trait]
-impl CommandTrait for Deny {
+impl CommandTrait for AccessTo {
     async fn run(&self) -> Result<(), Box<dyn Error>> {
         let creds = unsafe { CREDS.get_mut().unwrap() };
         if !creds.is_loggedin() {
             loggedin_only()
         }
 
-        trace!("Logged in, proceeding with removing access.");
-        let body = V1Access {
+        trace!("Logged in, proceeding with viewing access.");
+        let body = V1TokenAccessTypeOptionIdentifier {
             token: creds.token.clone(),
+            access_type: self.access.into(),
+            identifier_type: Some(goodmorning_bindings::services::v1::V1IdentifierType::Username),
             identifier: self.user.clone(),
-            identifier_type: V1IdentifierType::Username,
-            r#type: self.access.into(),
         };
 
-        let url = get_url("/api/accounts/v1/disallow").await;
+        let url = get_url("/api/accounts/v1/accessto").await;
 
         let res: V1Response = post(&url, body).await?;
         v1_handle(&res)?;

@@ -48,6 +48,7 @@ pub enum TopLevelSubcommands {
     Allow(Allow),
     Deny(Deny),
     Access(Access),
+    AccessTo(AccessTo),
 
     Jobs(Jobs),
 

@@ -577,7 +577,7 @@ dependencies = [
 [[package]]
 name = "goodmorning-bindings"
 version = "0.1.0"
-source = "git+https://github.com/gmornin/rust-bindings?rev=6093beb#6093bebfc90635af67b8e49ff0df3c37da54792d"
+source = "git+https://github.com/gmornin/rust-bindings?rev=2b7b5ec#2b7b5ecd6405c15c946e97ff234d363345349066"
 dependencies = [
  "chrono",
  "dyn-clone",
