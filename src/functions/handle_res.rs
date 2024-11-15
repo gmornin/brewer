@@ -16,6 +16,7 @@ use super::{duration_as_string, publishes_to_string, tree_show};
 pub fn ev1_handle(err: &V1Error) -> Result<(), Box<dyn Error>> {
     debug!("Handling error {err:?}");
     match err {
+        V1Error::QueueFull => println!("Job queue is currently full, please unqueue some jobs or try again later"),
         V1Error::Blacklisted => println!("You have been blacklisted from this action."),
         V1Error::Unpeakable => println!("Details of this trigger cannot be previewed."),
         V1Error::UsernameTaken => println!("The username you've chosen has already been taken by another user,\nplease choose another unique username.\nNote that 2 usernames with different casing are considered the same."),
@@ -37,7 +38,7 @@ pub fn ev1_handle(err: &V1Error) -> Result<(), Box<dyn Error>> {
         V1Error::EntryNotFound => println!("The requested publish entry cannot be found,\nthe entry could be removed, or it could just have never been there."),
         V1Error::TimedOut => println!("You action has been timed out,\nit has been running past the duration limit."),
         V1Error::EmailMismatch => println!("The email address you are verifying is not the same as the one currently linked to your account,\nyou might have changed your linkeda email."),
-        V1Error::TriggerNotFound => println!("The trigger action you've just tried to run does not exist,\neither the trigger ID is incorrect, or it has been expired."),
+        V1Error::TriggerNotFound => println!("The trigger action you've just tried to run does not exist,\neither the trigger ID is incorrect, or it has expired."),
         V1Error::PathOccupied => println!("The path you want to operate already exists,\nthis action does not allow you to operate on an already occupied location."),
         V1Error::FileNotFound => println!("The file you've requested cannot be found,\ncheck for typos, perhaps it has been deleted."),
         V1Error::FsError { content } => println!("The server's file system returned an error: {content}"),
@@ -70,6 +71,11 @@ pub fn ev1_handle(err: &V1Error) -> Result<(), Box<dyn Error>> {
 pub fn v1_handle(res: &V1Response) -> Result<(), Box<dyn Error>> {
     #[allow(unused_variables)]
     match res {
+        V1Response::Invited { code } => println!("New invite code created: {code}"),
+        V1Response::BluePresets { default, all } => println!("There are {} presets available, the default preset is {default}.{}", all.len(), all.iter().fold(String::new(), |mut buf, current| {
+write!(buf, "\n- {current}").unwrap();
+buf
+        })),
         V1Response::TriggerPeek { value } => todo!(),
         V1Response::Created { id, token, verify } => {
             println!("Account has been created,");
@@ -156,6 +162,8 @@ pub fn v1_handle(res: &V1Response) -> Result<(), Box<dyn Error>> {
         // TODO
         V1Response::TexUserPublishes { items, .. } => println!("{}", publishes_to_string(items.as_slice(), unsafe { INSTANCE.get().unwrap() }, *unsafe { USER_ID.get().unwrap() })),
         V1Response::TexPublishUpdated => println!("Published item has been updated."),
+        V1Response::WithinMap { redirect } => println!("You are trying to view items within a map at {redirect}."),
+        V1Response::BlueRendered { id, newpath } => println!("Render task completed [{id}],\nthe rendered map path is `/{newpath}`"),
         V1Response::Multi { res } => for res in res.clone().into_iter() {
             tokio::task::spawn_local(async move {
                 v1_handle(&res).expect("error while handling res")

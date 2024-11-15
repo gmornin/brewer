@@ -40,7 +40,7 @@ pub struct Access {
     #[argp(positional)]
     /// Access type to show.
     access: AccessType,
-    #[argp(option)]
+    #[argp(option, short = 'u')]
     /// User you want to view access of
     user: Option<String>,
 }

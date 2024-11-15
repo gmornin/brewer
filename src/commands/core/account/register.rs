@@ -16,6 +16,9 @@ use crate::{
 #[argp(subcommand, name = "register")]
 /// Register a new GM account.
 pub struct Register {
+    #[argp(positional)]
+    /// Invite code to server.
+    pub invite: Option<String>,
     #[argp(
         option,
         default = "crate::functions::prompt_sync(\"Username\")",
@@ -57,7 +60,10 @@ impl CommandTrait for Register {
             email: self.email.clone(),
             password: self.password.clone(),
         };
-        let url = get_url("/api/accounts/v1/create").await;
+        let mut url = get_url("/api/accounts/v1/create").await;
+        if let Some(invite) = &self.invite {
+            url.push_str(format!("?invite={invite}").as_str());
+        }
 
         let res: V1Response = post(&url, body).await?;
         v1_handle(&res)?;

@@ -49,6 +49,7 @@ pub enum TopLevelSubcommands {
     Deny(Deny),
     Access(Access),
     AccessTo(AccessTo),
+    Invite(Invite),
 
     Jobs(Jobs),
 
@@ -72,6 +73,8 @@ pub enum TopLevelSubcommands {
     Compile(Compile),
     Publish(Publish),
     Publishes(Publishes),
+
+    Render(Render),
 }
 
 impl TopLevel {
